@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 
 type Scored = {
   issue: { title: string; html_url: string; repository_url: string; comments: number; labels: { name: string }[]; _matchedLanguage: string };
@@ -63,6 +63,7 @@ export default function Home() {
   }
 
   const langEntries = skillGraph ? Object.entries(skillGraph.languageShare).sort((a, b) => b[1] - a[1]).slice(0, 6) : [];
+  const stageLabels = ['Developer', 'Skill Graph', 'GH Issues', 'Score'];
 
   return (
     <div className="wrap">
@@ -86,14 +87,18 @@ export default function Home() {
       <div className="status-line">{status}{loading && <span className="blink" />}</div>
 
       <div className="pipeline">
-        {['Developer', 'Skill Graph', 'GH Issues', 'Score'].map((label, i) => (
-          <>
-            <div className="node" key={label}>
+        {stageLabels.map((label, i) => (
+          <Fragment key={label}>
+            <div className="node">
               <div className={`node-dot${stage >= i ? ' active' : ''}`}>◆</div>
               <div className={`node-label${stage >= i ? ' active' : ''}`}>{label}</div>
             </div>
-            {i < 3 && <div className={`connector${stage > i ? ' active' : ''}`} key={label + '-c'}><div className="pulse" /></div>}
-          </>
+            {i < stageLabels.length - 1 && (
+              <div className={`connector${stage > i ? ' active' : ''}`}>
+                <div className="pulse" />
+              </div>
+            )}
+          </Fragment>
         ))}
       </div>
 
