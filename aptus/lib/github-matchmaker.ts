@@ -91,6 +91,13 @@ function estimateHours(difficulty: number): [number, number] {
   return table[difficulty] || [4, 10];
 }
 
+interface Breakdown {
+  language: number;
+  keywords: number;
+  prHistory: number;
+  accessibility: number;
+}
+
 function computeMatch(
   issue: GhIssue,
   skillGraph: { languageShare: Record<string, number>; keywords: string[] },
@@ -98,15 +105,29 @@ function computeMatch(
 ) {
   const text = `${issue.title || ''} ${issue.body || ''}`.toLowerCase();
   const langShare = skillGraph.languageShare[issue._matchedLanguage!] || 0.05;
-  let score = langShare * 45;
+
+  const languagePoints = Math.round(langShare * 45);
   const matchedKeywords = skillGraph.keywords.filter((k) => text.includes(k));
-  score += Math.min(matchedKeywords.length * 9, 36);
+  const keywordPoints = Math.min(matchedKeywords.length * 9, 36);
   const prBonusKeywords = matchedKeywords.filter((k) => prKeywordCounts[k]);
-  score += Math.min(prBonusKeywords.length * 6, 12);
+  const prPoints = Math.min(prBonusKeywords.length * 6, 12);
+
   const labels = (issue.labels || []).map((l) => l.name.toLowerCase());
-  if (labels.some((l) => l.includes('good first issue'))) score += 4;
-  if ((issue.comments || 0) <= 2) score += 3;
-  return { score: Math.max(5, Math.min(100, Math.round(score))), matchedKeywords, prBonusKeywords };
+  let accessibilityPoints = 0;
+  if (labels.some((l) => l.includes('good first issue'))) accessibilityPoints += 4;
+  if ((issue.comments || 0) <= 2) accessibilityPoints += 3;
+
+  const rawScore = languagePoints + keywordPoints + prPoints + accessibilityPoints;
+  const score = Math.max(5, Math.min(100, Math.round(rawScore)));
+
+  const breakdown: Breakdown = {
+    language: languagePoints,
+    keywords: keywordPoints,
+    prHistory: prPoints,
+    accessibility: accessibilityPoints,
+  };
+
+  return { score, matchedKeywords, prBonusKeywords, breakdown };
 }
 
 function computeProbability(matchScore: number, difficulty: number): number {
@@ -116,7 +137,19 @@ function computeProbability(matchScore: number, difficulty: number): number {
 
 export async function runAnalysis(username: string, token: string, emit: Emit) {
   emit({ type: 'status', stage: 0, message: `Fetching profile for ${username}...` });
-  await ghFetch(`https://api.github.com/users/${encodeURIComponent(username)}`, token);
+  const user = await ghFetch(`https://api.github.com/users/${encodeURIComponent(username)}`, token);
+  emit({
+    type: 'profile',
+    data: {
+      login: user.login,
+      name: user.name,
+      avatarUrl: user.avatar_url,
+      bio: user.bio,
+      followers: user.followers,
+      publicRepos: user.public_repos,
+      htmlUrl: user.html_url,
+    },
+  });
 
   emit({ type: 'status', stage: 0, message: 'Reading repositories...' });
   const repos = await ghFetch(
@@ -212,7 +245,7 @@ export async function runAnalysis(username: string, token: string, emit: Emit) {
   emit({ type: 'status', stage: 3, message: 'Scoring compatibility...' });
   const scored = allIssues
     .map((issue) => {
-      const { score, matchedKeywords, prBonusKeywords } = computeMatch(issue, skillGraph, prKeywordCounts);
+      const { score, matchedKeywords, prBonusKeywords, breakdown } = computeMatch(issue, skillGraph, prKeywordCounts);
       const difficulty = computeDifficulty(issue);
       const probability = computeProbability(score, difficulty);
       const [lo, hi] = estimateHours(difficulty);
@@ -225,12 +258,13 @@ export async function runAnalysis(username: string, token: string, emit: Emit) {
         matchedKeywords,
         prBonusKeywords,
         prKeywordCounts,
+        breakdown,
         repoCount: repoCountByLang[issue._matchedLanguage!] || 0,
         langShare: languageShare[issue._matchedLanguage!] || 0,
       };
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    .slice(0, 8);
 
   emit({ type: 'results', data: scored });
 }
