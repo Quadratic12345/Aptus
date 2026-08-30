@@ -53,21 +53,41 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function randomPage(max: number): number {
+  return Math.floor(Math.random() * max) + 1;
+}
+
 async function searchIssuesForLanguage(lang: string, token: string): Promise<GhIssue[]> {
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
-  const q1 = encodeURIComponent(`is:issue is:open language:${lang} label:"good first issue"`);
-  let data = await ghFetch(base + q1, token);
-  if (!data.items?.length) {
-    await delay(150);
-    const q2 = encodeURIComponent(`is:issue is:open language:${lang} label:"help wanted"`);
-    data = await ghFetch(base + q2, token);
+  const attempts = [
+    `is:issue is:open language:${lang} label:"good first issue" stars:>50`,
+    `is:issue is:open language:${lang} label:"help wanted" stars:>50`,
+    `is:issue is:open language:${lang} stars:>20`,
+    `is:issue is:open language:${lang}`,
+  ];
+
+  for (const q of attempts) {
+    try {
+      const page = randomPage(2);
+      const data = await ghFetch(`${base}${encodeURIComponent(q)}&page=${page}`, token);
+      if (data.items?.length) {
+        return data.items.map((it: GhIssue) => ({ ...it, _matchedLanguage: lang }));
+      }
+      await delay(120);
+    } catch {
+      /* try next tier */
+    }
   }
-  if (!data.items?.length) {
-    await delay(150);
-    const q3 = encodeURIComponent(`is:issue is:open language:${lang}`);
-    data = await ghFetch(base + q3, token);
-  }
-  return (data.items || []).map((it: GhIssue) => ({ ...it, _matchedLanguage: lang }));
+  return [];
 }
 
 function computeDifficulty(issue: GhIssue): number {
@@ -243,7 +263,7 @@ export async function runAnalysis(username: string, token: string, emit: Emit) {
   allIssues = allIssues.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
 
   emit({ type: 'status', stage: 3, message: 'Scoring compatibility...' });
-  const scored = allIssues
+  const scoredAll = allIssues
     .map((issue) => {
       const { score, matchedKeywords, prBonusKeywords, breakdown } = computeMatch(issue, skillGraph, prKeywordCounts);
       const difficulty = computeDifficulty(issue);
@@ -263,8 +283,11 @@ export async function runAnalysis(username: string, token: string, emit: Emit) {
         langShare: languageShare[issue._matchedLanguage!] || 0,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .sort((a, b) => b.score - a.score);
+
+  // Widen to a quality pool, then shuffle so repeated scans/refreshes surface different issues.
+  const pool = scoredAll.slice(0, 15);
+  const scored = shuffle(pool).slice(0, 8);
 
   emit({ type: 'results', data: scored });
 }
