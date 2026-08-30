@@ -1,14 +1,24 @@
 'use client';
-import { useState, useRef, Fragment } from 'react';
+import { useState, useRef, Fragment, useMemo } from 'react';
+
+const REPO_URL = 'https://github.com/Quadratic12345/Aptus';
 
 type Scored = {
   issue: { title: string; html_url: string; repository_url: string; comments: number; labels: { name: string }[]; _matchedLanguage: string };
   score: number; difficulty: number; probability: number; estimatedHours: [number, number];
   matchedKeywords: string[]; prBonusKeywords: string[]; prKeywordCounts: Record<string, number>;
+  breakdown: { language: number; keywords: number; prHistory: number; accessibility: number };
   repoCount: number; langShare: number;
 };
 
+type Profile = {
+  login: string; name: string | null; avatarUrl: string; bio: string | null;
+  followers: number; publicRepos: number; htmlUrl: string;
+};
+
 function diffClass(d: number) { return d <= 4 ? 'diff-easy' : d <= 7 ? 'diff-mid' : 'diff-hard'; }
+
+const SEGMENT_COLORS = ['var(--accent)', 'var(--pink)', 'var(--good)', 'var(--mid)'];
 
 export default function Home() {
   const [username, setUsername] = useState('');
@@ -17,8 +27,13 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [empty, setEmpty] = useState('');
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [skillGraph, setSkillGraph] = useState<{ languageShare: Record<string, number>; keywords: string[]; prKeywordCounts: Record<string, number> } | null>(null);
   const [results, setResults] = useState<Scored[] | null>(null);
+  const [sortBy, setSortBy] = useState<'match' | 'easiest' | 'fastest' | 'probability'>('match');
+  const [activeLangs, setActiveLangs] = useState<Set<string>>(new Set());
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function scan() {
@@ -26,7 +41,8 @@ export default function Home() {
     if (!u) { setStatus('Enter a GitHub username first.'); return; }
 
     setLoading(true); setStage(-1); setStatus(''); setError(''); setEmpty('');
-    setSkillGraph(null); setResults(null);
+    setProfile(null); setSkillGraph(null); setResults(null);
+    setActiveLangs(new Set()); setSortBy('match');
 
     try {
       const res = await fetch('/api/analyze', {
@@ -49,6 +65,7 @@ export default function Home() {
           if (!line.trim()) continue;
           const evt = JSON.parse(line);
           if (evt.type === 'status') { setStage(evt.stage); setStatus(evt.message); }
+          else if (evt.type === 'profile') setProfile(evt.data);
           else if (evt.type === 'skillgraph') setSkillGraph(evt.data);
           else if (evt.type === 'results') { setResults(evt.data); setStatus(`Done — ${evt.data.length} matches ranked.`); }
           else if (evt.type === 'empty') setEmpty(evt.message);
@@ -62,111 +79,212 @@ export default function Home() {
     }
   }
 
+  function toggleSaved(url: string) {
+    setSaved((prev) => {
+      const next = new Set(prev);
+      next.has(url) ? next.delete(url) : next.add(url);
+      return next;
+    });
+  }
+
+  function copyLink(url: string) {
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopied(url);
+      setTimeout(() => setCopied((c) => (c === url ? null : c)), 1500);
+    });
+  }
+
+  function toggleLang(lang: string) {
+    setActiveLangs((prev) => {
+      const next = new Set(prev);
+      next.has(lang) ? next.delete(lang) : next.add(lang);
+      return next;
+    });
+  }
+
+  const availableLangs = useMemo(
+    () => (results ? Array.from(new Set(results.map((s) => s.issue._matchedLanguage))) : []),
+    [results]
+  );
+
+  const displayed = useMemo(() => {
+    if (!results) return [];
+    let list = [...results];
+    if (activeLangs.size > 0) list = list.filter((s) => activeLangs.has(s.issue._matchedLanguage));
+    switch (sortBy) {
+      case 'easiest': list.sort((a, b) => a.difficulty - b.difficulty); break;
+      case 'fastest': list.sort((a, b) => a.estimatedHours[0] - b.estimatedHours[0]); break;
+      case 'probability': list.sort((a, b) => b.probability - a.probability); break;
+      default: list.sort((a, b) => b.score - a.score);
+    }
+    return list;
+  }, [results, sortBy, activeLangs]);
+
   const langEntries = skillGraph ? Object.entries(skillGraph.languageShare).sort((a, b) => b[1] - a[1]).slice(0, 6) : [];
   const stageLabels = ['Developer', 'Skill Graph', 'GH Issues', 'Score'];
 
   return (
-    <div className="wrap">
-      <div className="eyebrow"><span className="dot" />compatibility engine</div>
-      <h1>Open Source Contribution Matchmaker</h1>
-      <p className="sub">Reads your repos and pull requests, builds a skill graph, and scores live open issues against it — ranked by fit, not by luck.</p>
-
-      <div className="cmdbar">
-        <span className="prompt">&gt;</span>
-        <input
-          ref={inputRef}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && scan()}
-          placeholder="github username, e.g. torvalds"
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <button className="scan-btn" disabled={loading} onClick={scan}>Scan</button>
-      </div>
-      <div className="status-line">{status}{loading && <span className="blink" />}</div>
-
-      <div className="pipeline">
-        {stageLabels.map((label, i) => (
-          <Fragment key={label}>
-            <div className="node">
-              <div className={`node-dot${stage >= i ? ' active' : ''}`}>◆</div>
-              <div className={`node-label${stage >= i ? ' active' : ''}`}>{label}</div>
-            </div>
-            {i < stageLabels.length - 1 && (
-              <div className={`connector${stage > i ? ' active' : ''}`}>
-                <div className="pulse" />
-              </div>
-            )}
-          </Fragment>
-        ))}
+    <>
+      <div className="topbar">
+        <div className="brand"><span className="mark" />Aptus</div>
+        <a className="star-btn" href={REPO_URL} target="_blank" rel="noopener">
+          <span className="icon">★</span> Star on GitHub
+        </a>
       </div>
 
-      {skillGraph && (
-        <div className="panel">
-          <div className="panel-title">◈ SKILL GRAPH</div>
-          {langEntries.map(([lang, share]) => (
-            <div className="lang-row" key={lang}>
-              <div className="lang-name">{lang}</div>
-              <div className="lang-bar-track"><div className="lang-bar-fill" style={{ width: `${Math.round(share * 100)}%` }} /></div>
-              <div className="lang-pct">{Math.round(share * 100)}%</div>
-            </div>
-          ))}
-          <div className="tags">
-            {skillGraph.keywords.length === 0 && <span className="tag">no strong domain signals detected</span>}
-            {skillGraph.keywords.map((k) => (
-              <span className={`tag${skillGraph.prKeywordCounts[k] ? ' hot' : ''}`} key={k}>
-                {k}{skillGraph.prKeywordCounts[k] ? ` (${skillGraph.prKeywordCounts[k]} past PR${skillGraph.prKeywordCounts[k] > 1 ? 's' : ''})` : ''}
-              </span>
+      <div className="shell">
+        <div className="hero">
+          <div className="eyebrow"><span className="dot" />compatibility engine</div>
+          <h1>Open Source Contribution Matchmaker</h1>
+          <p className="sub">Reads your repos and pull requests, builds a skill graph, and scores live open issues against it — ranked by fit, not by luck.</p>
+
+          <div className="cmdbar">
+            <input
+              ref={inputRef}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && scan()}
+              placeholder="github username, e.g. torvalds"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button className="scan-btn" disabled={loading} onClick={scan}>Scan</button>
+          </div>
+          <div className="status-line">{status}{loading && <span className="blink" />}</div>
+
+          <div className="rail">
+            {stageLabels.map((label, i) => (
+              <Fragment key={label}>
+                <div className="rail-step">
+                  <div className={`rail-num${stage >= i ? ' active' : ''}`}>{i + 1}</div>
+                  <div className={`rail-label${stage >= i ? ' active' : ''}`}>{label}</div>
+                </div>
+                {i < stageLabels.length - 1 && <div className={`rail-line${stage > i ? ' active' : ''}`} />}
+              </Fragment>
             ))}
           </div>
         </div>
-      )}
 
-      {results && (
-        <>
-          <div className="results-head">
-            <h2>Top {results.length} matches for {username}</h2>
-            <div className="note">ranked by compatibility, not recency</div>
-          </div>
-          {results.map((s) => {
-            const repoFull = s.issue.repository_url.replace('https://api.github.com/repos/', '');
-            const lit = Math.round(s.score / 20);
-            return (
-              <div className="card" key={s.issue.html_url}>
-                <div className="card-top">
-                  <div>
-                    <div className="card-repo">{repoFull}</div>
-                    <div className="card-title"><a href={s.issue.html_url} target="_blank" rel="noopener">{s.issue.title}</a></div>
-                  </div>
-                  <div className="signal">
-                    <div className="signal-bars">
-                      {[0, 1, 2, 3, 4].map((b) => <div className={`bar${b < lit ? ' on' : ''}`} key={b} />)}
-                    </div>
-                    <div className="signal-pct">{s.score}%</div>
-                  </div>
-                </div>
-                <div className="why">
-                  You have <b>{s.repoCount}</b> repositor{s.repoCount === 1 ? 'y' : 'ies'} using <b>{s.issue._matchedLanguage}</b> (~{Math.round(s.langShare * 100)}% of your recent code).
-                  {s.prBonusKeywords.length > 0 && <> You&apos;ve previously opened <b>{s.prKeywordCounts[s.prBonusKeywords[0]]}</b> pull request{s.prKeywordCounts[s.prBonusKeywords[0]] > 1 ? 's' : ''} touching <b>{s.prBonusKeywords[0]}</b>.</>}
-                  {s.matchedKeywords.length > 0 && <> This issue involves {s.matchedKeywords.slice(0, 3).map((k) => <b key={k}>{k}</b>).reduce((a, b) => <>{a}, {b}</>)} — territory your own repos already cover.</>}
-                </div>
-                <div className="stat-row">
-                  <div className="stat"><span className="k">Difficulty</span><span className={`v ${diffClass(s.difficulty)}`}>{s.difficulty}/10</span></div>
-                  <div className="stat"><span className="k">Est. time</span><span className="v">{s.estimatedHours[0]}–{s.estimatedHours[1]}h</span></div>
-                  <div className="stat"><span className="k">Success probability</span><span className="v">{s.probability}%</span></div>
-                  <div className="stat"><span className="k">Open comments</span><span className="v">{s.issue.comments}</span></div>
-                </div>
-                <div className="labels-row">{s.issue.labels.slice(0, 5).map((l) => <span className="lbl" key={l.name}>{l.name}</span>)}</div>
+        {profile && (
+          <div className="block">
+            <div className="block-label">◈ Developer</div>
+            <div className="profile-row">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="avatar" src={profile.avatarUrl} alt={profile.login} />
+              <div className="profile-info">
+                <div className="profile-name">{profile.name || profile.login}</div>
+                <div className="profile-login">@{profile.login}</div>
+                {profile.bio && <p className="profile-bio">{profile.bio}</p>}
               </div>
-            );
-          })}
-          <div className="disclaimer">Difficulty, time, and probability are heuristic estimates from public GitHub signals — not a guarantee. Read the issue before committing.</div>
-        </>
-      )}
+              <div className="profile-stats">
+                <div className="profile-stat"><b>{profile.followers}</b><span>Followers</span></div>
+                <div className="profile-stat"><b>{profile.publicRepos}</b><span>Repos</span></div>
+              </div>
+              <a className="profile-link" href={profile.htmlUrl} target="_blank" rel="noopener">View Profile →</a>
+            </div>
+          </div>
+        )}
 
-      {empty && <div className="empty">{empty}</div>}
-      {error && <div className="err">&gt; {error}</div>}
-    </div>
+        {skillGraph && (
+          <div className="block">
+            <div className="block-label">◈ Skill Graph</div>
+            {langEntries.map(([lang, share]) => (
+              <div className="lang-row" key={lang}>
+                <div className="lang-name">{lang}</div>
+                <div className="lang-bar-track"><div className="lang-bar-fill" style={{ width: `${Math.round(share * 100)}%` }} /></div>
+                <div className="lang-pct">{Math.round(share * 100)}%</div>
+              </div>
+            ))}
+            <div className="tags">
+              {skillGraph.keywords.length === 0 && <span className="tag">no strong domain signals detected</span>}
+              {skillGraph.keywords.map((k) => (
+                <span className={`tag${skillGraph.prKeywordCounts[k] ? ' hot' : ''}`} key={k}>
+                  {k}{skillGraph.prKeywordCounts[k] ? ` (${skillGraph.prKeywordCounts[k]} past PR${skillGraph.prKeywordCounts[k] > 1 ? 's' : ''})` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {results && (
+          <>
+            <div className="toolbar">
+              <h2>Top {displayed.length} matches for {username}</h2>
+              <div className="toolbar-controls">
+                {availableLangs.map((lang) => (
+                  <button key={lang} className={`chip${activeLangs.has(lang) ? ' active' : ''}`} onClick={() => toggleLang(lang)}>
+                    {lang}
+                  </button>
+                ))}
+                <select className="select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                  <option value="match">Best match</option>
+                  <option value="easiest">Easiest first</option>
+                  <option value="fastest">Fastest</option>
+                  <option value="probability">Highest probability</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="results-grid">
+              {displayed.map((s) => {
+                const repoFull = s.issue.repository_url.replace('https://api.github.com/repos/', '');
+                const isSaved = saved.has(s.issue.html_url);
+                return (
+                  <div className="card" key={s.issue.html_url}>
+                    <div className="card-top">
+                      <div>
+                        <div className="card-repo">{repoFull}</div>
+                        <a className="card-title" href={s.issue.html_url} target="_blank" rel="noopener">{s.issue.title}</a>
+                      </div>
+                      <div className="ring" style={{ background: `conic-gradient(var(--accent) ${s.score}%, var(--panel-2) 0)` }}>
+                        <div className="ring-inner"><b>{s.score}</b><small>PCT</small></div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="breakdown"
+                      title={`Language ${s.breakdown.language} · Keywords ${s.breakdown.keywords} · PR history ${s.breakdown.prHistory} · Accessibility ${s.breakdown.accessibility}`}
+                    >
+                      {[s.breakdown.language, s.breakdown.keywords, s.breakdown.prHistory, s.breakdown.accessibility].map((v, i) => (
+                        <div key={i} style={{ width: `${v}%`, background: SEGMENT_COLORS[i] }} />
+                      ))}
+                    </div>
+
+                    <div className="why">
+                      You have <b>{s.repoCount}</b> repositor{s.repoCount === 1 ? 'y' : 'ies'} using <b>{s.issue._matchedLanguage}</b> (~{Math.round(s.langShare * 100)}% of your recent code).
+                      {s.prBonusKeywords.length > 0 && <> You&apos;ve previously opened <b>{s.prKeywordCounts[s.prBonusKeywords[0]]}</b> pull request{s.prKeywordCounts[s.prBonusKeywords[0]] > 1 ? 's' : ''} touching <b>{s.prBonusKeywords[0]}</b>.</>}
+                      {s.matchedKeywords.length > 0 && <> This issue involves {s.matchedKeywords.slice(0, 3).map((k) => <b key={k}>{k}</b>).reduce((a, b) => <>{a}, {b}</>)} — territory your own repos already cover.</>}
+                    </div>
+
+                    <div className="stat-grid">
+                      <div className="stat-box"><span className="k">Difficulty</span><span className={`v ${diffClass(s.difficulty)}`}>{s.difficulty}/10</span></div>
+                      <div className="stat-box"><span className="k">Est. time</span><span className="v">{s.estimatedHours[0]}–{s.estimatedHours[1]}h</span></div>
+                      <div className="stat-box"><span className="k">Odds</span><span className="v">{s.probability}%</span></div>
+                      <div className="stat-box"><span className="k">Comments</span><span className="v">{s.issue.comments}</span></div>
+                    </div>
+
+                    <div className="labels-row">{s.issue.labels.slice(0, 5).map((l) => <span className="lbl" key={l.name}>{l.name}</span>)}</div>
+
+                    <div className="card-actions">
+                      <button className={`icon-btn${isSaved ? ' saved' : ''}`} onClick={() => toggleSaved(s.issue.html_url)}>
+                        {isSaved ? '★ Saved' : '☆ Save'}
+                      </button>
+                      <button className="icon-btn" onClick={() => copyLink(s.issue.html_url)}>
+                        {copied === s.issue.html_url ? '✓ Copied' : '⎘ Copy link'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="disclaimer">Difficulty, time, and probability are heuristic estimates from public GitHub signals — not a guarantee. Read the issue before committing.</div>
+          </>
+        )}
+
+        {empty && <div className="empty">{empty}</div>}
+        {error && <div className="err">&gt; {error}</div>}
+      </div>
+    </>
   );
 }
