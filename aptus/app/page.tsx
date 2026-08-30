@@ -136,7 +136,7 @@ export default function Home() {
         <div className="hero">
           <div className="eyebrow"><span className="dot" />compatibility engine</div>
           <h1>Open Source Contribution Matchmaker</h1>
-          <p className="sub">Reads your repos and pull requests, builds a skill graph, and scores live open issues against it — ranked by fit, not by luck.</p>
+          <p className="sub">Reads your repos and pull requests, builds a skill graph, and scores live open issues against it ranked by fit, not by luck.</p>
 
           <div className="cmdbar">
             <input
@@ -278,7 +278,7 @@ export default function Home() {
               })}
             </div>
 
-            <div className="disclaimer">Difficulty, time, and probability are heuristic estimates from public GitHub signals — not a guarantee. Read the issue before committing.</div>
+            <div className="disclaimer">Difficulty, time, and probability are heuristic estimates from public GitHub signals not a guarantee. Read the issue before committing.</div>
           </>
         )}
 
