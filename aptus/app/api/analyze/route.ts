@@ -1,50 +1,37 @@
-import { db } from '@/lib/db';
-import { solvedIssues } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { runAnalysis } from '@/lib/github-matchmaker';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const username = searchParams.get('username');
-  if (!username) return Response.json({ error: 'username required' }, { status: 400 });
-
-  const rows = await db
-    .select()
-    .from(solvedIssues)
-    .where(eq(solvedIssues.githubUsername, username))
-    .orderBy(desc(solvedIssues.solvedAt));
-
-  return Response.json(rows);
-}
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { username, issueUrl, issueTitle, repoFullName, matchScore, difficulty } = body;
-  if (!username || !issueUrl || !issueTitle || !repoFullName) {
-    return Response.json({ error: 'missing fields' }, { status: 400 });
+  const { username } = await req.json();
+  const token = process.env.GITHUB_TOKEN;
+
+  if (!token) {
+    return new Response(JSON.stringify({ type: 'error', message: 'GITHUB_TOKEN is not set on the server.' }) + '\n', {
+      status: 500,
+    });
+  }
+  if (!username || typeof username !== 'string') {
+    return new Response(JSON.stringify({ type: 'error', message: 'Missing username.' }) + '\n', { status: 400 });
   }
 
-  await db
-    .insert(solvedIssues)
-    .values({
-      githubUsername: username,
-      issueUrl,
-      issueTitle,
-      repoFullName,
-      matchScore: matchScore ?? null,
-      difficulty: difficulty ?? null,
-    })
-    .onConflictDoNothing({ target: [solvedIssues.githubUsername, solvedIssues.issueUrl] });
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const emit = (obj: Record<string, unknown>) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
+      try {
+        await runAnalysis(username.trim().replace(/^@/, ''), token, emit);
+      } catch (e) {
+        emit({ type: 'error', message: e instanceof Error && e.message === 'NOT_FOUND'
+          ? `No GitHub user found for "${username}".`
+          : e instanceof Error ? e.message : 'Unknown error' });
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-  return Response.json({ ok: true });
-}
-
-export async function DELETE(req: Request) {
-  const { username, issueUrl } = await req.json();
-  if (!username || !issueUrl) return Response.json({ error: 'missing fields' }, { status: 400 });
-
-  await db
-    .delete(solvedIssues)
-    .where(and(eq(solvedIssues.githubUsername, username), eq(solvedIssues.issueUrl, issueUrl)));
-
-  return Response.json({ ok: true });
+  return new Response(stream, {
+    headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' },
+  });
 }
