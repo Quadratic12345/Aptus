@@ -134,8 +134,18 @@ export default function Home() {
 
       <div className="shell">
         <div className="hero">
-          <div className="eyebrow"><span className="dot" />compatibility engine</div>
-          <h1>Open Source Contribution Matchmaker</h1>
+          <div className="eyebrow" style={{ justifyContent: "center", fontSize:"14px" }}>
+            <span className="dot" />
+            <span>compatibility engine</span>
+          </div>
+
+
+
+          <h1>
+            Open Source <span style={{ color: "var(--accent)" }}>Contribution</span> Matchmaker
+          </h1>
+
+
           <p className="sub">Reads your repos and pull requests, builds a skill graph, and scores live open issues against it ranked by fit, not by luck.</p>
 
           <div className="cmdbar">
@@ -144,7 +154,7 @@ export default function Home() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && scan()}
-              placeholder="github username, e.g. torvalds"
+              placeholder="enter your github username"
               autoComplete="off"
               spellCheck={false}
             />

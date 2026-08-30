@@ -52,7 +52,7 @@ a{color:inherit;}
 
 .hero{padding:52px 0 6px;}
 .eyebrow{
-  font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; text-align:center;
   color:var(--accent); display:flex; align-items:center; gap:8px; margin-bottom:14px;
 }
 .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
