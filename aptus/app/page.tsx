@@ -1,7 +1,9 @@
+
 'use client';
 
-import StarIcon from "@/components/ui/star-icon";
-import RefreshIcon from "@/components/ui/refresh-icon";
+import StarIcon from '@/components/ui/star-icon';
+import RefreshIcon from '@/components/ui/refresh-icon';
+import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo } from 'react';
 
 const REPO_URL = 'https://github.com/Quadratic12345/Aptus';
@@ -42,8 +44,22 @@ type Profile = {
   htmlUrl: string;
 };
 
+type SavedIssue = {
+  id: number;
+  issueUrl: string;
+  issueTitle: string;
+  repoFullName: string;
+  matchScore: number | null;
+  difficulty: number | null;
+  savedAt: string;
+};
+
 function diffClass(d: number) {
-  return d <= 4 ? 'diff-easy' : d <= 7 ? 'diff-mid' : 'diff-hard';
+  return d <= 4
+    ? 'diff-easy'
+    : d <= 7
+      ? 'diff-mid'
+      : 'diff-hard';
 }
 
 const SEGMENT_COLORS = [
@@ -78,10 +94,92 @@ export default function Home() {
     new Set()
   );
 
-  const [saved, setSaved] = useState<Set<string>>(new Set());
+  // URLs of issues that are actually saved in the database.
+  const [saved, setSaved] = useState<Set<string>>(
+    new Set()
+  );
+
   const [copied, setCopied] = useState<string | null>(null);
 
+  const [solvedMarked, setSolvedMarked] = useState<Set<string>>(
+    new Set()
+  );
+
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Load saved issues from the database.
+   *
+   * This is separate from the visual "saved" state so that
+   * refreshing/scanning doesn't lose the user's saved issues.
+   */
+  async function loadSavedIssues(u: string) {
+    const trimmed = u.trim().replace(/^@/, '');
+
+    if (!trimmed) {
+      setSaved(new Set());
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/issues/saved?username=${encodeURIComponent(trimmed)}`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        console.warn(
+          'Could not load saved issues:',
+          res.status,
+          text
+        );
+        return;
+      }
+
+      if (!text.trim()) {
+        setSaved(new Set());
+        return;
+      }
+
+      let data: unknown;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.warn(
+          'Saved issues API returned invalid JSON.'
+        );
+        return;
+      }
+
+      if (!Array.isArray(data)) {
+        setSaved(new Set());
+        return;
+      }
+
+      const urls = data
+        .map((item: SavedIssue) => item.issueUrl)
+        .filter(
+          (url): url is string =>
+            typeof url === 'string' && url.length > 0
+        );
+
+      setSaved(new Set(urls));
+    } catch (e) {
+      console.warn(
+        'Could not load saved issues:',
+        e
+      );
+    }
+  }
 
   async function scan() {
     const u = username.trim().replace(/^@/, '');
@@ -102,6 +200,9 @@ export default function Home() {
     setActiveLangs(new Set());
     setSortBy('match');
 
+    // Load existing saved issues before displaying new results.
+    await loadSavedIssues(u);
+
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -115,7 +216,7 @@ export default function Home() {
 
       if (!res.ok) {
         throw new Error(
-          `Analysis request failed (${res.status}).`
+          `Request failed with status ${res.status}.`
         );
       }
 
@@ -138,6 +239,7 @@ export default function Home() {
         });
 
         const lines = buffer.split('\n');
+
         buffer = lines.pop() || '';
 
         for (const line of lines) {
@@ -171,6 +273,10 @@ export default function Home() {
           }
         }
       }
+
+      // Reload saved issues after the scan as well.
+      // This keeps the UI synchronized with the database.
+      await loadSavedIssues(u);
     } catch (e) {
       setError(
         e instanceof Error
@@ -182,30 +288,148 @@ export default function Home() {
     }
   }
 
-  function toggleSaved(url: string) {
-    setSaved((prev) => {
-      const next = new Set(prev);
+  /**
+   * Save or unsave an issue in the database.
+   */
+  async function toggleSaved(s: Scored) {
+    const u = username.trim().replace(/^@/, '');
 
-      if (next.has(url)) {
-        next.delete(url);
+    if (!u) {
+      setError('Enter your GitHub username first.');
+      return;
+    }
+
+    const url = s.issue.html_url;
+    const isCurrentlySaved = saved.has(url);
+
+    setError('');
+
+    try {
+      if (isCurrentlySaved) {
+        // -----------------------------
+        // UNSAVE
+        // -----------------------------
+        const res = await fetch('/api/issues/saved', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            username: u,
+            issueUrl: url,
+          }),
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          let message = 'Failed to unsave issue.';
+
+          if (text.trim()) {
+            try {
+              const data = JSON.parse(text);
+
+              if (data?.error) {
+                message = data.error;
+              } else if (data?.message) {
+                message = data.message;
+              }
+            } catch {
+              // Response wasn't JSON.
+            }
+          }
+
+          throw new Error(message);
+        }
+
+        setSaved((prev) => {
+          const next = new Set(prev);
+          next.delete(url);
+          return next;
+        });
       } else {
-        next.add(url);
-      }
+        // -----------------------------
+        // SAVE
+        // -----------------------------
+        const repoFull = s.issue.repository_url.replace(
+          'https://api.github.com/repos/',
+          ''
+        );
 
-      return next;
-    });
+        const res = await fetch('/api/issues/saved', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            username: u,
+            issueUrl: url,
+            issueTitle: s.issue.title,
+            repoFullName: repoFull,
+            matchScore: s.score,
+            difficulty: s.difficulty,
+          }),
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          let message = 'Failed to save issue.';
+
+          if (text.trim()) {
+            try {
+              const data = JSON.parse(text);
+
+              if (data?.error) {
+                message = data.error;
+              } else if (data?.message) {
+                message = data.message;
+              }
+            } catch {
+              // Response wasn't JSON.
+            }
+          }
+
+          throw new Error(message);
+        }
+
+        setSaved((prev) => {
+          const next = new Set(prev);
+          next.add(url);
+          return next;
+        });
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not update saved issue.'
+      );
+    }
   }
 
   function copyLink(url: string) {
-    navigator.clipboard?.writeText(url).then(() => {
-      setCopied(url);
+    if (!navigator.clipboard) {
+      setError('Clipboard access is not available.');
+      return;
+    }
 
-      setTimeout(() => {
-        setCopied((c) =>
-          c === url ? null : c
-        );
-      }, 1500);
-    });
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setCopied(url);
+
+        setTimeout(() => {
+          setCopied((c) =>
+            c === url ? null : c
+          );
+        }, 1500);
+      })
+      .catch(() => {
+        setError('Could not copy the link.');
+      });
   }
 
   function toggleLang(lang: string) {
@@ -220,6 +444,72 @@ export default function Home() {
 
       return next;
     });
+  }
+
+  async function markSolved(s: Scored) {
+    const u = username.trim().replace(/^@/, '');
+
+    if (!u) {
+      setError('Enter your GitHub username first.');
+      return;
+    }
+
+    const repoFull = s.issue.repository_url.replace(
+      'https://api.github.com/repos/',
+      ''
+    );
+
+    try {
+      const res = await fetch('/api/issues/solved', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: u,
+          issueUrl: s.issue.html_url,
+          issueTitle: s.issue.title,
+          repoFullName: repoFull,
+          matchScore: s.score,
+          difficulty: s.difficulty,
+        }),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        let message =
+          'Failed to mark issue as solved.';
+
+        if (text.trim()) {
+          try {
+            const data = JSON.parse(text);
+
+            if (data?.error) {
+              message = data.error;
+            } else if (data?.message) {
+              message = data.message;
+            }
+          } catch {
+            // Response wasn't JSON.
+          }
+        }
+
+        throw new Error(message);
+      }
+
+      setSolvedMarked((prev) => {
+        const next = new Set(prev);
+        next.add(s.issue.html_url);
+        return next;
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not mark issue as solved.'
+      );
+    }
   }
 
   const availableLangs = useMemo(
@@ -272,10 +562,13 @@ export default function Home() {
         );
         break;
 
+      case 'match':
       default:
         list.sort(
-          (a, b) => b.score - a.score
+          (a, b) =>
+            b.score - a.score
         );
+        break;
     }
 
     return list;
@@ -304,17 +597,33 @@ export default function Home() {
           Aptus
         </div>
 
-        <a
-          className="star-btn"
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+        <div
+          style={{
+            display: 'flex',
+            gap: '10px',
+          }}
         >
-          <span className="icon">
-            <StarIcon />
-          </span>
-          Star on GitHub
-        </a>
+          <Link
+            className="star-btn"
+            href={`/profile?username=${encodeURIComponent(
+              username || ''
+            )}`}
+          >
+            My Profile
+          </Link>
+
+          <a
+            className="star-btn"
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span className="icon">
+              <StarIcon />
+            </span>
+            Star on GitHub
+          </a>
+        </div>
       </div>
 
       <div className="shell">
@@ -519,8 +828,8 @@ export default function Home() {
             )}
 
             <div className="tags">
-              {skillGraph.keywords
-                .length === 0 && (
+              {skillGraph.keywords.length ===
+                0 && (
                 <span className="tag">
                   no strong domain signals
                   detected
@@ -544,14 +853,11 @@ export default function Home() {
                       .prKeywordCounts[k]
                       ? ` (${
                           skillGraph
-                            .prKeywordCounts[
-                              k
-                            ]
+                            .prKeywordCounts[k]
                         } past PR${
                           skillGraph
-                            .prKeywordCounts[
-                              k
-                            ] > 1
+                            .prKeywordCounts[k] >
+                          1
                             ? 's'
                             : ''
                         })`
@@ -577,7 +883,8 @@ export default function Home() {
                   onClick={scan}
                   disabled={loading}
                 >
-                  <RefreshIcon /> Refresh
+                  <RefreshIcon />
+                  Refresh
                 </button>
 
                 {availableLangs.map(
@@ -592,7 +899,9 @@ export default function Home() {
                           : ''
                       }`}
                       onClick={() =>
-                        toggleLang(lang)
+                        toggleLang(
+                          lang
+                        )
                       }
                     >
                       {lang}
@@ -642,6 +951,11 @@ export default function Home() {
                     s.issue.html_url
                   );
 
+                const isMarkedSolved =
+                  solvedMarked.has(
+                    s.issue.html_url
+                  );
+
                 return (
                   <div
                     className="card"
@@ -672,8 +986,12 @@ export default function Home() {
                         }}
                       >
                         <div className="ring-inner">
-                          <b>{s.score}</b>
-                          <small>PCT</small>
+                          <b>
+                            {s.score}
+                          </b>
+                          <small>
+                            PCT
+                          </small>
                         </div>
                       </div>
                     </div>
@@ -691,7 +1009,8 @@ export default function Home() {
                           ?.prHistory ?? 0
                       } · Accessibility ${
                         s.breakdown
-                          ?.accessibility ?? 0
+                          ?.accessibility ??
+                        0
                       }`}
                     >
                       {[
@@ -702,19 +1021,22 @@ export default function Home() {
                         s.breakdown
                           ?.prHistory ?? 0,
                         s.breakdown
-                          ?.accessibility ?? 0,
-                      ].map((v, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            width: `${v}%`,
-                            background:
-                              SEGMENT_COLORS[
-                                i
-                              ],
-                          }}
-                        />
-                      ))}
+                          ?.accessibility ??
+                          0,
+                      ].map(
+                        (v, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: `${v}%`,
+                              background:
+                                SEGMENT_COLORS[
+                                  i
+                                ],
+                            }}
+                          />
+                        )
+                      )}
                     </div>
 
                     <div className="why">
@@ -723,7 +1045,8 @@ export default function Home() {
                         {s.repoCount}
                       </b>{' '}
                       repositor
-                      {s.repoCount === 1
+                      {s.repoCount ===
+                      1
                         ? 'y'
                         : 'ies'}{' '}
                       using{' '}
@@ -735,15 +1058,19 @@ export default function Home() {
                       </b>{' '}
                       (~
                       {Math.round(
-                        s.langShare * 100
+                        s.langShare *
+                          100
                       )}
                       % of your recent code).
 
-                      {s.prBonusKeywords
-                        .length > 0 && (
+                      {s
+                        .prBonusKeywords
+                        .length >
+                        0 && (
                         <>
                           {' '}
-                          You&apos;ve previously
+                          You've
+                          previously
                           opened{' '}
                           <b>
                             {
@@ -754,12 +1081,13 @@ export default function Home() {
                               ]
                             }
                           </b>{' '}
-                          pull request
+                          pull
+                          request
                           {s
                             .prKeywordCounts[
-                              s
-                                .prBonusKeywords[0]
-                            ] > 1
+                            s
+                              .prBonusKeywords[0]
+                          ] > 1
                             ? 's'
                             : ''}{' '}
                           touching{' '}
@@ -773,30 +1101,28 @@ export default function Home() {
                         </>
                       )}
 
-                      {s.matchedKeywords
-                        .length > 0 && (
+                      {s
+                        .matchedKeywords
+                        .length >
+                        0 && (
                         <>
                           {' '}
-                          This issue involves{' '}
-                          {s.matchedKeywords
-                            .slice(0, 3)
-                            .map((k) => (
-                              <b key={k}>
-                                {k}
-                              </b>
-                            ))
-                            .reduce(
-                              (
-                                a,
-                                b
-                              ) => (
-                                <>
-                                  {a}, {b}
-                                </>
+                          This issue
+                          involves{' '}
+                          <b>
+                            {s.matchedKeywords
+                              .slice(
+                                0,
+                                3
                               )
-                            )}{' '}
-                          — territory your own
-                          repos already cover.
+                              .join(
+                                ', '
+                              )}
+                          </b>{' '}
+                          — territory
+                          your own
+                          repos already
+                          cover.
                         </>
                       )}
                     </div>
@@ -812,7 +1138,10 @@ export default function Home() {
                             s.difficulty
                           )}`}
                         >
-                          {s.difficulty}/10
+                          {
+                            s.difficulty
+                          }
+                          /10
                         </span>
                       </div>
 
@@ -841,7 +1170,10 @@ export default function Home() {
                         </span>
 
                         <span className="v">
-                          {s.probability}%
+                          {
+                            s.probability
+                          }
+                          %
                         </span>
                       </div>
 
@@ -851,7 +1183,10 @@ export default function Home() {
                         </span>
 
                         <span className="v">
-                          {s.issue.comments}
+                          {
+                            s.issue
+                              .comments
+                          }
                         </span>
                       </div>
                     </div>
@@ -862,7 +1197,9 @@ export default function Home() {
                         .map((l) => (
                           <span
                             className="lbl"
-                            key={l.name}
+                            key={
+                              l.name
+                            }
                           >
                             {l.name}
                           </span>
@@ -877,10 +1214,7 @@ export default function Home() {
                             : ''
                         }`}
                         onClick={() =>
-                          toggleSaved(
-                            s.issue
-                              .html_url
-                          )
+                          toggleSaved(s)
                         }
                       >
                         {isSaved
@@ -898,9 +1232,28 @@ export default function Home() {
                         }
                       >
                         {copied ===
-                        s.issue.html_url
+                        s.issue
+                          .html_url
                           ? '✓ Copied'
                           : '⎘ Copy link'}
+                      </button>
+
+                      <button
+                        className={`icon-btn${
+                          isMarkedSolved
+                            ? ' saved'
+                            : ''
+                        }`}
+                        onClick={() =>
+                          markSolved(s)
+                        }
+                        disabled={
+                          isMarkedSolved
+                        }
+                      >
+                        {isMarkedSolved
+                          ? '✓ Marked Solved'
+                          : '✔ Mark Solved'}
                       </button>
                     </div>
                   </div>
@@ -909,11 +1262,11 @@ export default function Home() {
             </div>
 
             <div className="disclaimer">
-              Difficulty, time, and probability
-              are heuristic estimates from
-              public GitHub signals not a
-              guarantee. Read the issue before
-              committing.
+              Difficulty, time, and
+              probability are heuristic
+              estimates from public GitHub
+              signals not a guarantee. Read
+              the issue before committing.
             </div>
           </>
         )}
