@@ -973,3 +973,12 @@ body {
   display:flex; justify-content:center; align-items:center;
   padding:50px 24px 70px; border-top:1px solid var(--border); margin-top:30px;
 }
+.signin-github-btn{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; margin-top:22px;
+  font-family:var(--display); font-weight:700; font-size:14px;
+  background:var(--accent); color:var(--accent-ink);
+  border:none; border-radius:999px; padding:13px 22px;
+  cursor:pointer;
+}
+.signin-github-btn:hover{filter:brightness(1.08);}
