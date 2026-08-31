@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import * as authSchema from "@/lib/db/auth-schema";
 
 export const auth = betterAuth({
+  baseURL: "https://aptusoss.vercel.app",
+
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: authSchema,
@@ -12,8 +14,8 @@ export const auth = betterAuth({
 
   socialProviders: {
     github: {
-      clientId: process.env.GITHUB_CLIENT_ID as string,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
     },
   },
 
