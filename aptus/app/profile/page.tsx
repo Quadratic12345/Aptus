@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from '@/lib/auth-client';
+import { useSession, signOut } from '@/lib/auth-client';
 
 type Saved = {
   id: number;
@@ -19,12 +19,7 @@ export default function ProfilePage() {
   const [items, setItems] = useState<Saved[] | null>(null);
   const [error, setError] = useState('');
 
-
-
-
-  const githubUsername = session?.user?.name?.trim().replace(/^@/, '') || '';
-
-
+  const githubUsername = session?.user?.name || '';
 
   useEffect(() => {
     if (!githubUsername) return;
@@ -46,8 +41,21 @@ export default function ProfilePage() {
   return (
     <>
       <div className="topbar">
-        <div className="brand"><span className="mark" />Aptus</div>
-        <Link className="star-btn" href="/">← Back to Scanner</Link>
+        <Link className="brand-link" href="/">
+          Aptus
+        </Link>
+
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <Link className="star-btn" href="/">
+            ← Back to Scanner
+          </Link>
+
+          {session && (
+            <button className="icon-btn" onClick={() => signOut()}>
+              Sign out
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="shell">

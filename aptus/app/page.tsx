@@ -1,6 +1,7 @@
 
 'use client';
-import { useSession, signOut } from '@/lib/auth-client';
+
+import { useSession } from '@/lib/auth-client';
 import StarIcon from '@/components/ui/star-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import Link from 'next/link';
@@ -546,43 +547,30 @@ export default function Home() {
 
   return (
     <>
-      <div className="topbar">
-        <Link className="brand-link" href="/">
-          Aptus
-        </Link>
+    <div className="topbar">
+      <Link className="brand-link" href="/">
+        Aptus
+      </Link>
+
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <a className="star-btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+          <span className="icon">
+            <StarIcon />
+          </span>
+          Star on GitHub
+        </a>
 
         {session ? (
-          <div
-            style={{
-              display: 'flex',
-              gap: '10px',
-              alignItems: 'center',
-            }}
-          >
-            <Link
-              className="star-btn"
-              href="/profile"
-            >
-              {session.user.name || 'My Profile'}
-            </Link>
-
-            <button
-              className="icon-btn"
-              onClick={() => signOut()}
-            >
-              Sign out
-            </button>
-          </div>
+          <Link className="star-btn" href="/profile">
+            {session.user.name || 'My Profile'}
+          </Link>
         ) : (
-          <Link
-            className="star-btn"
-            href="/sign-in"
-          >
+          <Link className="star-btn" href="/sign-in">
             Sign In
           </Link>
         )}
       </div>
-
+    </div>
       <div className="shell">
         <div className="hero">
           <div
@@ -1227,20 +1215,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      <footer className="site-footer">
-        <a
-          className="star-btn"
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span className="icon">
-            <StarIcon />
-          </span>
-          Star on GitHub
-        </a>
-      </footer>
     </>
   );
 }

@@ -939,7 +939,9 @@ body {
 }
 .signin-shell{display:grid; grid-template-columns:1fr 1fr; min-height:100vh;}
 .signin-art{
-  background:linear-gradient(160deg, #0a0a0a 0%, #14170a 60%, #1a2000 100%);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.8)),
+    url('/signin-art.jpg') center/cover no-repeat;
   display:flex; align-items:center; justify-content:center; padding:60px;
   border-right:1px solid var(--border);
 }
