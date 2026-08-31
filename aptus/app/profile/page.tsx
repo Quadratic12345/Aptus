@@ -21,7 +21,9 @@ export default function ProfilePage() {
 
 
 
-  const githubUsername = session?.user?.githubUsername || '';
+
+  const githubUsername = session?.user?.name?.trim().replace(/^@/, '') || '';
+
 
 
   useEffect(() => {
