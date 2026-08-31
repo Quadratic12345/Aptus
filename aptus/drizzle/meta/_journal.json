@@ -8,6 +8,13 @@
       "when": 1788116520092,
       "tag": "0000_military_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788171923661,
+      "tag": "0001_familiar_goliath",
+      "breakpoints": true
     }
   ]
 }

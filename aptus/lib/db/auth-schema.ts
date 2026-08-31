@@ -6,15 +6,18 @@ import {
   boolean,
 } from 'drizzle-orm/pg-core';
 
+
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
+  githubUsername: text('github_username'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),
