@@ -173,7 +173,7 @@ h1{
   letter-spacing:-0.025em; line-height:1.1; margin:0 0 24px;
 }
 .sub{
-  color:var(--muted); font-size:17px; font-weight:500; line-height:1.7;
+  color:var(--muted); font-size:17px; font-weight:500; font-style:italic; line-height:1.7;
   max-width:600px; margin:0 auto 44px;
 }
 .cmdbar{
