@@ -26,7 +26,7 @@ export default function SignInPage() {
 
           <button
             className="scan-btn signin-github-btn"
-            onClick={() => signIn.social({ provider: 'github', callbackURL: '/' })}
+            onClick={() => signIn.social({ provider: 'github', callbackURL: '/profile' })}
           >
             Continue with GitHub
           </button>
