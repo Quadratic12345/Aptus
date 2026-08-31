@@ -1,3 +1,4 @@
+
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/lib/db";
@@ -8,18 +9,20 @@ export const auth = betterAuth({
     provider: "pg",
     schema: authSchema,
   }),
+
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID as string,
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
-      mapProfileToUser: (profile: { login: string }) => ({
-        githubUsername: profile.login,
-      }),
     },
   },
+
   user: {
     additionalFields: {
-      githubUsername: { type: "string", required: false },
+      githubUsername: {
+        type: "string",
+        required: false,
+      },
     },
   },
 });
