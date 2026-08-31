@@ -1,7 +1,6 @@
 
 'use client';
 import { useSession, signOut } from '@/lib/auth-client';
-import StarIcon from '@/components/ui/star-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo } from 'react';
@@ -70,6 +69,8 @@ const SEGMENT_COLORS = [
 ];
 
 export default function Home() {
+  const { data: session } = useSession();
+
   const [username, setUsername] = useState('');
   const [stage, setStage] = useState(-1);
   const [status, setStatus] = useState('');
@@ -290,123 +291,63 @@ export default function Home() {
 
   /**
    * Save or unsave an issue in the database.
+   *
+   * Saved issues are now keyed to the signed-in user's
+   * GitHub username/name instead of the username being scanned.
    */
   async function toggleSaved(s: Scored) {
-    const u = username.trim().replace(/^@/, '');
-
-    if (!u) {
-      setError('Enter your GitHub username first.');
+    if (!session) {
+      window.location.href = '/sign-in';
       return;
     }
 
     const url = s.issue.html_url;
     const isCurrentlySaved = saved.has(url);
+    const me =
+      session.user.githubUsername ||
+      session.user.name ||
+      '';
 
-    setError('');
+    setSaved((prev) => {
+      const next = new Set(prev);
+      isCurrentlySaved
+        ? next.delete(url)
+        : next.add(url);
+      return next;
+    });
 
-    try {
-      if (isCurrentlySaved) {
-        // -----------------------------
-        // UNSAVE
-        // -----------------------------
-        const res = await fetch('/api/issues/saved', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            username: u,
-            issueUrl: url,
-          }),
-        });
-
-        const text = await res.text();
-
-        if (!res.ok) {
-          let message = 'Failed to unsave issue.';
-
-          if (text.trim()) {
-            try {
-              const data = JSON.parse(text);
-
-              if (data?.error) {
-                message = data.error;
-              } else if (data?.message) {
-                message = data.message;
-              }
-            } catch {
-              // Response wasn't JSON.
-            }
-          }
-
-          throw new Error(message);
-        }
-
-        setSaved((prev) => {
-          const next = new Set(prev);
-          next.delete(url);
-          return next;
-        });
-      } else {
-        // -----------------------------
-        // SAVE
-        // -----------------------------
-        const repoFull = s.issue.repository_url.replace(
+    if (isCurrentlySaved) {
+      await fetch('/api/issues/saved', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: me,
+          issueUrl: url,
+        }),
+      });
+    } else {
+      const repoFull =
+        s.issue.repository_url.replace(
           'https://api.github.com/repos/',
           ''
         );
 
-        const res = await fetch('/api/issues/saved', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            username: u,
-            issueUrl: url,
-            issueTitle: s.issue.title,
-            repoFullName: repoFull,
-            matchScore: s.score,
-            difficulty: s.difficulty,
-          }),
-        });
-
-        const text = await res.text();
-
-        if (!res.ok) {
-          let message = 'Failed to save issue.';
-
-          if (text.trim()) {
-            try {
-              const data = JSON.parse(text);
-
-              if (data?.error) {
-                message = data.error;
-              } else if (data?.message) {
-                message = data.message;
-              }
-            } catch {
-              // Response wasn't JSON.
-            }
-          }
-
-          throw new Error(message);
-        }
-
-        setSaved((prev) => {
-          const next = new Set(prev);
-          next.add(url);
-          return next;
-        });
-      }
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not update saved issue.'
-      );
+      await fetch('/api/issues/saved', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: me,
+          issueUrl: url,
+          issueTitle: s.issue.title,
+          repoFullName: repoFull,
+          matchScore: s.score,
+          difficulty: s.difficulty,
+        }),
+      });
     }
   }
 
@@ -597,33 +538,36 @@ export default function Home() {
           Aptus
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            gap: '10px',
-          }}
-        >
+        {session ? (
+          <div
+            style={{
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'center',
+            }}
+          >
+            <Link
+              className="star-btn"
+              href="/profile"
+            >
+              {session.user.name || 'My Profile'}
+            </Link>
+
+            <button
+              className="icon-btn"
+              onClick={() => signOut()}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
           <Link
             className="star-btn"
-            href={`/profile?username=${encodeURIComponent(
-              username || ''
-            )}`}
+            href="/sign-in"
           >
-            My Profile
+            Sign In
           </Link>
-
-          <a
-            className="star-btn"
-            href={REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="icon">
-              <StarIcon />
-            </span>
-            Star on GitHub
-          </a>
-        </div>
+        )}
       </div>
 
       <div className="shell">
@@ -1283,6 +1227,17 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <footer className="site-footer">
+        <a
+          className="star-btn"
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ★ Star on GitHub
+        </a>
+      </footer>
     </>
   );
 }
