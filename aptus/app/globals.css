@@ -941,7 +941,7 @@ body {
 .signin-art{
   background:
     linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.8)),
-    url('/signin-art.jpg') center/cover no-repeat;
+    url('/signin.jpeg') center/cover no-repeat;
   display:flex; align-items:center; justify-content:center; padding:60px;
   border-right:1px solid var(--border);
 }
