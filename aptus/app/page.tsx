@@ -104,6 +104,7 @@ export default function Home() {
   const [copied, setCopied] = useState<string | null>(null);
 
   const [stars, setStars] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetch('https://api.github.com/repos/Quadratic12345/Aptus')
@@ -298,6 +299,85 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+  async function refreshResults() {
+    const u = username.trim().replace(/^@/, '');
+
+    if (!u) return;
+
+    setRefreshing(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: u,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(
+          `Request failed with status ${res.status}.`
+        );
+      }
+
+      if (!res.body) {
+        throw new Error('No response stream.');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, {
+          stream: true,
+        });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          try {
+            const evt = JSON.parse(line);
+
+            // Only swap in new results — leave profile, skill graph,
+            // and the pipeline rail alone so the page doesn't blank out.
+            if (evt.type === 'results') {
+              setResults(evt.data);
+              setStatus(`Refreshed — ${evt.data.length} matches ranked.`);
+            } else if (evt.type === 'empty') {
+              setEmpty(evt.message);
+            } else if (evt.type === 'error') {
+              setError(evt.message);
+            }
+          } catch {
+            console.warn('Could not parse stream event:', line);
+          }
+        }
+      }
+
+      await loadSavedIssues(u);
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not refresh matches.'
+      );
+    } finally {
+      setRefreshing(false);
     }
   }
 
