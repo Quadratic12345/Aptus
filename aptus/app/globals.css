@@ -182,7 +182,11 @@ h1{
   padding:8px 8px 8px 22px;
   max-width:560px;
   width:100%;
-  margin:0 auto 0;
+  margin: 0 auto;
+}
+.hero-cta-row{
+  display:flex; gap:10px; align-items:center; justify-content:center;
+  margin: calc(14vh - 68px) 0 24px;
 }
 .cmdbar:focus-within{
   border-color:var(--accent);
@@ -245,7 +249,7 @@ h1{
 /* pipeline rail */
 .rail{
   display:flex; align-items:center;
-  margin:48px auto 8px;
+  margin: 48px auto 8px;
   max-width:560px;
   width:100%;
 }

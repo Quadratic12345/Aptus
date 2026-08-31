@@ -611,6 +611,23 @@ export default function Home() {
             not by luck.
           </p>
 
+          <div className="hero-cta-row">
+            <a className="star-btn pill-white" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+              <GithubIcon />
+              <span>Contribute here</span>
+            </a>
+
+            {session ? (
+              <Link className="star-btn" href="/profile">
+                {session.user.name || 'My Profile'}
+              </Link>
+            ) : (
+              <Link className="star-btn pill-white" href="/sign-in">
+                To see the saved
+              </Link>
+            )}
+          </div>
+
           <div className="cmdbar">
             <input
               ref={inputRef}
