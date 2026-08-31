@@ -19,7 +19,9 @@ export default function ProfilePage() {
   const [items, setItems] = useState<Saved[] | null>(null);
   const [error, setError] = useState('');
 
-  const githubUsername = session?.user?.githubUsername || session?.user?.name || '';
+
+  const githubUsername = session?.user?.name || '';
+
 
   useEffect(() => {
     if (!githubUsername) return;
