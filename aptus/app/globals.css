@@ -955,3 +955,19 @@ body {
   .signin-art{display:none;}
 }
 .site-footer{display:flex; justify-content:center; padding:40px 24px 60px; border-top:1px solid var(--border); margin-top:20px;}
+/* brand wordmark — clickable, bigger, no dot */
+.brand-link{
+  font-family:var(--display); font-weight:700; font-size:24px; letter-spacing:-0.015em;
+  color:var(--text); text-decoration:none; cursor:pointer;
+}
+.brand-link:hover{color:var(--accent);}
+
+/* pill-shaped buttons: star/profile/sign-in link + sign-out/save/copy buttons */
+.star-btn{border-radius:999px;}
+.icon-btn{border-radius:999px; padding:8px 16px;}
+
+/* footer sits at the true bottom, separate from the topbar */
+.site-footer{
+  display:flex; justify-content:center; align-items:center;
+  padding:50px 24px 70px; border-top:1px solid var(--border); margin-top:30px;
+}
