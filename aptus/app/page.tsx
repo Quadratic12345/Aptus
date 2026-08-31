@@ -1,6 +1,6 @@
 
 'use client';
-
+import { useSession, signOut } from '@/lib/auth-client';
 import StarIcon from '@/components/ui/star-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import Link from 'next/link';
