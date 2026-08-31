@@ -304,10 +304,9 @@ export default function Home() {
 
     const url = s.issue.html_url;
     const isCurrentlySaved = saved.has(url);
-    const me =
-      session.user.githubUsername ||
-      session.user.name ||
-      '';
+
+    const me = username.trim().replace(/^@/, '');
+
 
     setSaved((prev) => {
       const next = new Set(prev);
