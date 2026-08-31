@@ -1,6 +1,7 @@
 
 'use client';
 import { useSession, signOut } from '@/lib/auth-client';
+import StarIcon from '@/components/ui/star-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo } from 'react';
@@ -1228,6 +1229,7 @@ export default function Home() {
         )}
       </div>
 
+
       <footer className="site-footer">
         <a
           className="star-btn"
@@ -1235,9 +1237,13 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          ★ Star on GitHub
+          <span className="icon">
+            <StarIcon />
+          </span>
+          Star on GitHub
         </a>
       </footer>
+
     </>
   );
 }
