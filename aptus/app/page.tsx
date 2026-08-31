@@ -1,11 +1,9 @@
-
 'use client';
-
 import { useSession } from '@/lib/auth-client';
-import StarIcon from '@/components/ui/star-icon';
+import GithubIcon from '@/components/ui/github-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import Link from 'next/link';
-import { useState, useRef, Fragment, useMemo } from 'react';
+import { useState, useRef, Fragment, useMemo, useEffect } from 'react';
 
 const REPO_URL = 'https://github.com/Quadratic12345/Aptus';
 
@@ -89,6 +87,7 @@ export default function Home() {
 
   const [results, setResults] = useState<Scored[] | null>(null);
 
+
   const [sortBy, setSortBy] = useState<
     'match' | 'easiest' | 'fastest' | 'probability'
   >('match');
@@ -103,6 +102,17 @@ export default function Home() {
   );
 
   const [copied, setCopied] = useState<string | null>(null);
+
+  const [stars, setStars] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/Quadratic12345/Aptus')
+      .then((res) => res.json())
+      .then((data) =>
+        setStars(typeof data.stargazers_count === 'number' ? data.stargazers_count : null)
+      )
+      .catch(() => setStars(null));
+  }, []);
 
   const [solvedMarked, setSolvedMarked] = useState<Set<string>>(
     new Set()
@@ -544,33 +554,31 @@ export default function Home() {
     'GH Issues',
     'Score',
   ];
-
   return (
     <>
-    <div className="topbar">
-      <Link className="brand-link" href="/">
-        Aptus
-      </Link>
+      <div className="topbar">
+        <Link className="brand-link" href="/">
+          Aptus
+        </Link>
 
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <a className="star-btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">
-          <span className="icon">
-            <StarIcon />
-          </span>
-          Star on GitHub
-        </a>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <a className="star-btn pill-white" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            <GithubIcon />
+            <span>{stars !== null ? stars.toLocaleString() : '—'}</span>
+          </a>
 
-        {session ? (
-          <Link className="star-btn" href="/profile">
-            {session.user.name || 'My Profile'}
-          </Link>
-        ) : (
-          <Link className="star-btn" href="/sign-in">
-            Sign In
-          </Link>
-        )}
+          {session ? (
+            <Link className="star-btn" href="/profile">
+              {session.user.name || 'My Profile'}
+            </Link>
+          ) : (
+            <Link className="star-btn pill-white" href="/sign-in">
+              Get Started
+            </Link>
+          )}
+        </div>
       </div>
-    </div>
+
       <div className="shell">
         <div className="hero">
           <div
@@ -659,15 +667,16 @@ export default function Home() {
                   </div>
                 </div>
 
-                {i <
-                  stageLabels.length - 1 && (
-                    <div
-                      className={`rail-line${stage > i
-                        ? ' active'
-                        : ''
-                        }`}
-                    />
-                  )}
+
+                {i < stageLabels.length - 1 && (
+                  <div
+                    className={`rail-line${stage > i
+                      ? ' active'
+                      : ''
+                    }`}
+                  />
+                )}
+
               </Fragment>
             ))}
           </div>
@@ -904,8 +913,8 @@ export default function Home() {
                         <div className="card-repo">
                           {repoFull}
                         </div>
+                      <a
 
-                        <a
                           className="card-title"
                           href={
                             s.issue.html_url
@@ -1215,6 +1224,7 @@ export default function Home() {
           </div>
         )}
       </div>
+
     </>
   );
 }

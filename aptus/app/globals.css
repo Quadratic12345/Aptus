@@ -963,12 +963,13 @@ body {
   color:var(--text); text-decoration:none; cursor:pointer;
 }
 .brand-link:hover{color:var(--accent);}
-
-/* pill-shaped buttons: star/profile/sign-in link + sign-out/save/copy buttons */
 .star-btn{border-radius:999px;}
+.pill-white{
+  background:#ffffff; color:#0a0a0a; border-color:#ffffff;
+  display:flex; align-items:center; gap:7px;
+}
+.pill-white:hover{background:#e5e5e5; color:#0a0a0a;}
 .icon-btn{border-radius:999px; padding:8px 16px;}
-
-/* footer sits at the true bottom, separate from the topbar */
 .site-footer{
   display:flex; justify-content:center; align-items:center;
   padding:50px 24px 70px; border-top:1px solid var(--border); margin-top:30px;
