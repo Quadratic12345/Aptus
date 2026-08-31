@@ -965,9 +965,10 @@ body {
 .brand-link:hover{color:var(--accent);}
 .star-btn{border-radius:999px;}
 .pill-white{
-  background:#ffffff; color:#0a0a0a; border-color:#ffffff;
+  background:#0a0a0a; color:#ffffff; border-color:#0a0a0a;
   display:flex; align-items:center; gap:7px;
 }
+.pill-white:hover{background:#1a1a1a; color:#ffffff;}
 .pill-white:hover{background:#e5e5e5; color:#0a0a0a;}
 .icon-btn{border-radius:999px; padding:8px 16px;}
 .site-footer{
