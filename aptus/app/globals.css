@@ -937,3 +937,21 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
   gap: 16px;
 }
+.signin-shell{display:grid; grid-template-columns:1fr 1fr; min-height:100vh;}
+.signin-art{
+  background:linear-gradient(160deg, #0a0a0a 0%, #14170a 60%, #1a2000 100%);
+  display:flex; align-items:center; justify-content:center; padding:60px;
+  border-right:1px solid var(--border);
+}
+.signin-art-inner{max-width:420px;}
+.signin-art-headline{font-family:var(--display); font-weight:700; font-size:32px; line-height:1.15; margin:28px 0 16px;}
+.signin-art-sub{color:var(--muted); font-size:14.5px; line-height:1.6;}
+.signin-form-side{display:flex; align-items:center; justify-content:center; padding:40px;}
+.signin-card{max-width:380px; width:100%;}
+.signin-title{font-family:var(--display); font-weight:700; font-size:26px; margin:14px 0 6px;}
+.signin-github-btn{width:100%; margin-top:22px; text-align:center;}
+@media (max-width:800px){
+  .signin-shell{grid-template-columns:1fr;}
+  .signin-art{display:none;}
+}
+.site-footer{display:flex; justify-content:center; padding:40px 24px 60px; border-top:1px solid var(--border); margin-top:20px;}
