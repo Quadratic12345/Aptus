@@ -20,7 +20,8 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
 
 
-  const githubUsername = session?.user?.name || '';
+
+  const githubUsername = session?.user?.githubUsername || '';
 
 
   useEffect(() => {

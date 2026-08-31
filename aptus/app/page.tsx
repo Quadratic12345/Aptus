@@ -305,7 +305,9 @@ export default function Home() {
     const url = s.issue.html_url;
     const isCurrentlySaved = saved.has(url);
 
-    const me = username.trim().replace(/^@/, '');
+
+    const me = session?.user?.name?.trim().replace(/^@/, '') || '';
+
 
 
     setSaved((prev) => {
@@ -315,6 +317,7 @@ export default function Home() {
         : next.add(url);
       return next;
     });
+
 
     if (isCurrentlySaved) {
       await fetch('/api/issues/saved', {
@@ -349,7 +352,7 @@ export default function Home() {
         }),
       });
     }
-  }
+
 
   function copyLink(url: string) {
     if (!navigator.clipboard) {
