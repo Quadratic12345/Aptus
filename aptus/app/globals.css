@@ -937,12 +937,12 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
   gap: 16px;
 }
-.signin-shell{display:grid; grid-template-columns:1fr 1fr; min-height:100vh;}
+.signin-shell{display:grid; grid-template-columns:1fr 1fr; min-height:calc(100vh - 68px);}
 .signin-art{
   background:
-    linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.8)),
-    url('/signin.jpeg') center/cover no-repeat;
-  display:flex; align-items:center; justify-content:center; padding:60px;
+    linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.9) 100%),
+    url('/signin-art.jpg') center/cover no-repeat;
+  display:flex; align-items:flex-end; justify-content:flex-start; padding:50px;
   border-right:1px solid var(--border);
 }
 .signin-art-inner{max-width:420px;}
