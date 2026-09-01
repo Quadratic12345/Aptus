@@ -27,3 +27,13 @@ export const savedIssues = pgTable(
     ),
   })
 );
+
+export const scanHistory = pgTable('scan_history', {
+  id: serial('id').primaryKey(),
+  scannedBy: text('scanned_by').notNull(),
+  targetUsername: text('target_username').notNull(),
+  profileJson: text('profile_json'),
+  skillGraphJson: text('skill_graph_json'),
+  resultsJson: text('results_json').notNull(),
+  scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+});
