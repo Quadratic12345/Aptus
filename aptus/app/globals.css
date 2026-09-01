@@ -975,3 +975,19 @@ body {
 .topbar{ flex: 0 0 auto; }
 .page-footer{ flex: 0 0 auto; }
 .shell{ flex: 1 0 auto; }
+.recent-label{
+  font-family:var(--mono); font-size:10px; color:var(--dim); text-transform:uppercase;
+  letter-spacing:.08em; text-align:center; margin:20px 0 8px;
+}
+.recent-row{
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+  max-width:560px; margin:0 auto;
+}
+.recent-chip{
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--mono); font-size:11.5px; font-weight:600;
+  background:var(--panel); border:1px solid var(--border); border-radius:20px;
+  padding:5px 12px 5px 6px; color:var(--muted); cursor:pointer;
+}
+.recent-chip:hover{border-color:var(--accent); color:var(--text);}
+.recent-chip img{width:18px; height:18px; border-radius:50%;}

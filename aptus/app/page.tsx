@@ -52,6 +52,14 @@ type SavedIssue = {
   difficulty: number | null;
   savedAt: string;
 };
+type RecentScan = {
+  id: number;
+  targetUsername: string;
+  scannedAt: string;
+  profile: Profile | null;
+  skillGraph: { languageShare: Record<string, number>; keywords: string[]; prKeywordCounts: Record<string, number> } | null;
+  results: Scored[];
+};
 
 function diffClass(d: number) {
   return d <= 4
@@ -104,6 +112,32 @@ export default function Home() {
   const [copied, setCopied] = useState<string | null>(null);
 
   const [stars, setStars] = useState<number | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[] | null>(null);
+
+  function fetchRecentScans() {
+    fetch('/api/scans/recent')
+      .then((res) => res.json())
+      .then((data) => setRecentScans(Array.isArray(data) ? data : []))
+      .catch(() => setRecentScans([]));
+  }
+
+  useEffect(() => {
+    fetchRecentScans();
+  }, []);
+
+  function loadFromCache(entry: RecentScan) {
+    setUsername(entry.targetUsername);
+    setError('');
+    setEmpty('');
+    setProfile(entry.profile);
+    setSkillGraph(entry.skillGraph);
+    setResults(entry.results);
+    setStage(3);
+    setStatus(
+      `Loaded from cache — scanned ${new Date(entry.scannedAt).toLocaleDateString()}.`
+    );
+    loadSavedIssues(entry.targetUsername);
+  }
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -292,9 +326,11 @@ export default function Home() {
                       skillGraph: latestSkillGraph,
                       results: evt.data,
                     }),
-                  }).catch(() => {
-                    // history save is best-effort, never block the UI on it
-                  });
+                  })
+                    .then(() => fetchRecentScans())
+                    .catch(() => {
+                      // history save is best-effort, never block the UI on it
+                    });
                 }
               }
             } else if (evt.type === 'empty') {
@@ -756,6 +792,27 @@ export default function Home() {
               {loading ? 'Scanning...' : 'Scan'}
             </button>
           </div>
+
+          {recentScans && recentScans.length > 0 && (
+            <>
+              <div className="recent-label">Recently analyzed</div>
+              <div className="recent-row">
+                {recentScans.map((r) => (
+                  <button
+                    key={r.id}
+                    className="recent-chip"
+                    onClick={() => loadFromCache(r)}
+                  >
+                    {r.profile?.avatarUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.profile.avatarUrl} alt={r.targetUsername} />
+                    )}
+                    @{r.targetUsername}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="status-line">
             {status}
