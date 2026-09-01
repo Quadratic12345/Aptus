@@ -259,6 +259,10 @@ export default function Home() {
         for (const line of lines) {
           if (!line.trim()) continue;
 
+        let latestProfile: Profile | null = null;
+        let latestSkillGraph: typeof skillGraph = null;
+
+          try {
           try {
             const evt = JSON.parse(line);
 
@@ -267,13 +271,34 @@ export default function Home() {
               setStatus(evt.message);
             } else if (evt.type === 'profile') {
               setProfile(evt.data);
+              latestProfile = evt.data;
             } else if (evt.type === 'skillgraph') {
               setSkillGraph(evt.data);
+              latestSkillGraph = evt.data;
             } else if (evt.type === 'results') {
               setResults(evt.data);
               setStatus(
                 `Done — ${evt.data.length} matches ranked.`
               );
+
+              if (session) {
+                const me = session.user?.name?.trim().replace(/^@/, '') || '';
+                if (me) {
+                  fetch('/api/scans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      scannedBy: me,
+                      targetUsername: u,
+                      profile: latestProfile,
+                      skillGraph: latestSkillGraph,
+                      results: evt.data,
+                    }),
+                  }).catch(() => {
+                    // history save is best-effort, never block the UI on it
+                  });
+                }
+              }
             } else if (evt.type === 'empty') {
               setEmpty(evt.message);
             } else if (evt.type === 'error') {
