@@ -120,7 +120,9 @@ a{
   font-size:12.5px;
   border:none;
   color:var(--text);
-  background:transparent;
+
+  background:var(--panel);
+
   padding:9px 16px;
   border-radius:8px;
   text-decoration:none;
