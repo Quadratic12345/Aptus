@@ -717,7 +717,9 @@ h1{
   font-weight:700;
   font-size:11.5px;
   border:1px solid var(--border);
-  background:var(--panel-2);
+
+  background:var(--panel);
+
   border-radius:7px;
   padding:7px 13px;
   cursor:pointer;
