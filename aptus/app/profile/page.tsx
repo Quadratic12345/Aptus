@@ -14,19 +14,38 @@ type Saved = {
   savedAt: string;
 };
 
+type HistoryEntry = {
+  id: number;
+  targetUsername: string;
+  scannedAt: string;
+  profile: { avatarUrl: string; name: string | null; login: string } | null;
+  results: {
+    issue: { title: string; html_url: string; repository_url: string };
+    score: number;
+  }[];
+};
+
 export default function ProfilePage() {
   const { data: session, isPending } = useSession();
   const [items, setItems] = useState<Saved[] | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   const githubUsername = session?.user?.name || '';
 
   useEffect(() => {
     if (!githubUsername) return;
+
     fetch(`/api/issues/saved?username=${encodeURIComponent(githubUsername)}`)
       .then((res) => res.json())
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => setError('Could not load saved issues.'));
+
+    fetch(`/api/scans?scannedBy=${encodeURIComponent(githubUsername)}`)
+      .then((res) => res.json())
+      .then((data) => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => setError('Could not load search history.'));
   }, [githubUsername]);
 
   async function unsave(issueUrl: string) {
@@ -59,15 +78,15 @@ export default function ProfilePage() {
       </div>
 
       <div className="shell">
-        <div className="hero">
+        <div className="hero" style={{ padding: '52px 0 24px' }}>
           <div className="eyebrow"><span className="dot" />profile</div>
-          <h1>Saved Issues</h1>
+          <h1>Your Activity</h1>
 
           {isPending && <p className="sub">Loading your session...</p>}
 
           {!isPending && !session && (
             <>
-              <p className="sub">You need to sign in to see your saved issues.</p>
+              <p className="sub">You need to sign in to see your saved issues and search history.</p>
               <Link className="scan-btn" href="/sign-in">Sign In</Link>
             </>
           )}
@@ -106,6 +125,73 @@ export default function ProfilePage() {
               </div>
             ) : (
               session && <div className="empty">No saved issues yet.</div>
+            )}
+          </>
+        )}
+
+        {history && (
+          <>
+            <div className="toolbar">
+              <h2>Search history</h2>
+            </div>
+
+            {history.length > 0 ? (
+              <div className="results-grid">
+                {history.map((h) => (
+                  <div className="card" key={h.id}>
+                    <div className="card-top">
+                      <div>
+                        <div className="card-repo">
+                          scanned {new Date(h.scannedAt).toLocaleDateString()}
+                        </div>
+                        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {h.profile?.avatarUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={h.profile.avatarUrl}
+                              alt={h.targetUsername}
+                              style={{ width: 22, height: 22, borderRadius: '50%' }}
+                            />
+                          )}
+                          @{h.targetUsername}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="sub" style={{ margin: '10px 0 0', fontStyle: 'normal', textAlign: 'left' }}>
+                      {h.results.length} matched issue{h.results.length === 1 ? '' : 's'} — cached, no GitHub calls needed to view.
+                    </p>
+
+                    <div className="card-actions">
+                      <button
+                        className="icon-btn"
+                        onClick={() => setExpanded(expanded === h.id ? null : h.id)}
+                      >
+                        {expanded === h.id ? '▲ Hide issues' : '▼ Show issues'}
+                      </button>
+                    </div>
+
+                    {expanded === h.id && (
+                      <div className="labels-row" style={{ flexDirection: 'column', alignItems: 'stretch', marginTop: '12px' }}>
+                        {h.results.map((r) => (
+                          <a
+                            key={r.issue.html_url}
+                            href={r.issue.html_url}
+                            target="_blank"
+                            rel="noopener"
+                            className="lbl"
+                            style={{ padding: '8px 10px', textAlign: 'left' }}
+                          >
+                            {r.score}% — {r.issue.title}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              session && <div className="empty">No searches yet — scan a username on the main page.</div>
             )}
           </>
         )}
