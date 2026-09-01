@@ -56,9 +56,7 @@ type RecentScan = {
   id: number;
   targetUsername: string;
   scannedAt: string;
-  profile: Profile | null;
-  skillGraph: { languageShare: Record<string, number>; keywords: string[]; prKeywordCounts: Record<string, number> } | null;
-  results: Scored[];
+  avatarUrl: string | null;
 };
 
 function diffClass(d: number) {
@@ -96,9 +94,11 @@ export default function Home() {
   const [results, setResults] = useState<Scored[] | null>(null);
 
 
+
   const [sortBy, setSortBy] = useState<
     'match' | 'easiest' | 'fastest' | 'probability'
   >('match');
+
 
   const [activeLangs, setActiveLangs] = useState<Set<string>>(
     new Set()
@@ -125,18 +125,34 @@ export default function Home() {
     fetchRecentScans();
   }, []);
 
-  function loadFromCache(entry: RecentScan) {
-    setUsername(entry.targetUsername);
+  const [loadingCacheId, setLoadingCacheId] = useState<number | null>(null);
+
+  async function loadFromCache(entry: RecentScan) {
+    setLoadingCacheId(entry.id);
     setError('');
     setEmpty('');
-    setProfile(entry.profile);
-    setSkillGraph(entry.skillGraph);
-    setResults(entry.results);
-    setStage(3);
-    setStatus(
-      `Loaded from cache — scanned ${new Date(entry.scannedAt).toLocaleDateString()}.`
-    );
-    loadSavedIssues(entry.targetUsername);
+
+    try {
+      const res = await fetch(`/api/scans/${entry.id}`);
+      if (!res.ok) throw new Error('Could not load cached scan.');
+
+      const data = await res.json();
+
+      setUsername(data.targetUsername);
+      setProfile(data.profile);
+      setSkillGraph(data.skillGraph);
+      setResults(data.results);
+      setStage(3);
+      setStatus(
+        `Loaded from cache — scanned ${new Date(data.scannedAt).toLocaleDateString()}.`
+      );
+
+      loadSavedIssues(data.targetUsername);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load cached scan.');
+    } finally {
+      setLoadingCacheId(null);
+    }
   }
   const [refreshing, setRefreshing] = useState(false);
 
@@ -155,12 +171,6 @@ export default function Home() {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /**
-   * Load saved issues from the database.
-   *
-   * This is separate from the visual "saved" state so that
-   * refreshing/scanning doesn't lose the user's saved issues.
-   */
   async function loadSavedIssues(u: string) {
     const trimmed = u.trim().replace(/^@/, '');
 
@@ -248,8 +258,10 @@ export default function Home() {
     setActiveLangs(new Set());
     setSortBy('match');
 
-    // Load existing saved issues before displaying new results.
     await loadSavedIssues(u);
+
+    let latestProfile: Profile | null = null;
+    let latestSkillGraph: typeof skillGraph = null;
 
     try {
       const res = await fetch('/api/analyze', {
@@ -293,8 +305,6 @@ export default function Home() {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-        let latestProfile: Profile | null = null;
-        let latestSkillGraph: typeof skillGraph = null;
           try {
             const evt = JSON.parse(line);
 
@@ -347,8 +357,6 @@ export default function Home() {
         }
       }
 
-      // Reload saved issues after the scan as well.
-      // This keeps the UI synchronized with the database.
       await loadSavedIssues(u);
     } catch (e) {
       setError(
@@ -412,8 +420,6 @@ export default function Home() {
           try {
             const evt = JSON.parse(line);
 
-            // Only swap in new results — leave profile, skill graph,
-            // and the pipeline rail alone so the page doesn't blank out.
             if (evt.type === 'results') {
               setResults(evt.data);
               setStatus(`Refreshed — ${evt.data.length} matches ranked.`);
@@ -440,12 +446,6 @@ export default function Home() {
     }
   }
 
-  /**
-   * Save or unsave an issue in the database.
-   *
-   * Saved issues are keyed to the signed-in user's
-   * GitHub username/name instead of the username being scanned.
-   */
   async function toggleSaved(s: Scored) {
     if (!session) {
       window.location.href = '/sign-in';
@@ -536,13 +536,6 @@ export default function Home() {
     });
   }
 
-  /**
-   * NOTE: this now writes to the same /api/issues/saved table
-   * that the Save button uses (the old /api/issues/solved route
-   * no longer exists). Functionally redundant with Save right now —
-   * consider removing this button, or repurposing it to track a
-   * distinct "solved" status via an extra column later.
-   */
   async function markSolved(s: Scored) {
     if (!session) {
       window.location.href = '/sign-in';
@@ -606,7 +599,6 @@ export default function Home() {
         return next;
       });
 
-      // This also counts as "saved" now, since it's the same table.
       setSaved((prev) => new Set(prev).add(s.issue.html_url));
     } catch (e) {
       setError(
@@ -813,12 +805,13 @@ export default function Home() {
                     key={r.id}
                     className="recent-chip"
                     onClick={() => loadFromCache(r)}
+                    disabled={loadingCacheId === r.id}
                   >
-                    {r.profile?.avatarUrl && (
+                    {r.avatarUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.profile.avatarUrl} alt={r.targetUsername} />
+                      <img src={r.avatarUrl} alt={r.targetUsername} />
                     )}
-                    @{r.targetUsername}
+                    {loadingCacheId === r.id ? 'Loading…' : `@${r.targetUsername}`}
                   </button>
                 ))}
               </div>
@@ -917,7 +910,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <a
+            <a
                 className="profile-link"
                 href={profile.htmlUrl}
                 target="_blank"
@@ -1016,11 +1009,11 @@ export default function Home() {
               <div className="toolbar-controls">
                 <button
                   className="chip"
-                  onClick={scan}
-                  disabled={loading}
+                  onClick={refreshResults}
+                  disabled={refreshing}
                 >
                   <RefreshIcon />
-                  Refresh
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
 
                 {availableLangs.map(
@@ -1101,8 +1094,7 @@ export default function Home() {
                         <div className="card-repo">
                           {repoFull}
                         </div>
-                      <a
-
+                       <a
                           className="card-title"
                           href={
                             s.issue.html_url
