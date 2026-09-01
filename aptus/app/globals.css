@@ -991,3 +991,14 @@ body {
 }
 .recent-chip:hover{border-color:var(--accent); color:var(--text);}
 .recent-chip img{width:18px; height:18px; border-radius:50%;}
+.star-btn:focus,
+.icon-btn:focus,
+.brand-link:focus{
+  outline: none;
+}
+.star-btn:focus-visible,
+.icon-btn:focus-visible,
+.brand-link:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
