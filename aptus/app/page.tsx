@@ -718,18 +718,29 @@ export default function Home() {
         </div>
       </div>
 
+
       <div className="shell">
         <div className="hero">
+
+
           <div
             className="eyebrow"
             style={{
               justifyContent: 'center',
-              fontSize: '14px',
+              fontSize: '16px',
+              fontFamily: "'Nunito', sans-serif",
+              fontWeight: '600',
+              letterSpacing: '0.02em',
+              textTransform: 'none',
+              gap: '8px',
             }}
           >
-            <span className="dot" />
-            <span>compatibility engine</span>
+            <GithubIcon />
+            <span>Proudly Open Source</span>
           </div>
+
+
+
 
           <h1>
             Open Source{' '}
