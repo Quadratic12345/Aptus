@@ -961,3 +961,17 @@ body {
   cursor:pointer;
 }
 .signin-github-btn:hover{filter:brightness(1.08);}
+.page-footer{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px; border-top:1px solid var(--border);
+  font-family:var(--mono); font-size:12px; color:var(--dim);
+}
+.page-footer .heart{color:var(--color-red-600);}
+.page-flex-wrap{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.topbar{ flex: 0 0 auto; }
+.page-footer{ flex: 0 0 auto; }
+.shell{ flex: 1 0 auto; }

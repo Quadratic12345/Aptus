@@ -196,6 +196,11 @@ export default function ProfilePage() {
           </>
         )}
       </div>
+
+      <div className="page-footer">
+        <span>© {new Date().getFullYear()} Aptus. All rights reserved.</span>
+        <span>Made with <span className="heart">♥</span> by Sankalp</span>
+      </div>
     </>
   );
 }
