@@ -726,7 +726,7 @@ export default function Home() {
               </Link>
             ) : (
               <Link className="star-btn pill-white" href="/sign-in">
-                To see the saved
+                History
               </Link>
             )}
           </div>
