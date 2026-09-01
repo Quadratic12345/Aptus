@@ -127,12 +127,40 @@ export default function Home() {
 
   const [loadingCacheId, setLoadingCacheId] = useState<number | null>(null);
 
+
+  async function deleteRecentScan(
+    id: number,
+    e: React.MouseEvent<HTMLButtonElement>
+  ) {
+    e.stopPropagation();
+
+    // Optimistically remove it from the UI
+    setRecentScans((prev) =>
+      prev ? prev.filter((r) => r.id !== id) : null
+    );
+
+    try {
+      const res = await fetch(`/api/scans/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        // Restore the list if deletion failed
+        fetchRecentScans();
+      }
+    } catch {
+      // Restore the list if the request failed
+      fetchRecentScans();
+    }
+  }
+
   async function loadFromCache(entry: RecentScan) {
     setLoadingCacheId(entry.id);
     setError('');
     setEmpty('');
 
     try {
+
       const res = await fetch(`/api/scans/${entry.id}`);
       if (!res.ok) throw new Error('Could not load cached scan.');
 
@@ -801,18 +829,27 @@ export default function Home() {
               <div className="recent-label">Recently analyzed</div>
               <div className="recent-row">
                 {recentScans.map((r) => (
-                  <button
-                    key={r.id}
-                    className="recent-chip"
-                    onClick={() => loadFromCache(r)}
-                    disabled={loadingCacheId === r.id}
-                  >
-                    {r.avatarUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.avatarUrl} alt={r.targetUsername} />
-                    )}
-                    {loadingCacheId === r.id ? 'Loading…' : `@${r.targetUsername}`}
-                  </button>
+                  <div key={r.id} className="recent-chip">
+                    <button
+                      className="recent-chip-main"
+                      onClick={() => loadFromCache(r)}
+                      disabled={loadingCacheId === r.id}
+                    >
+                      {r.avatarUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.avatarUrl} alt={r.targetUsername} />
+                      )}
+                      {loadingCacheId === r.id ? 'Loading…' : `@${r.targetUsername}`}
+                    </button>
+
+                    <button
+                      className="recent-chip-delete"
+                      onClick={(e) => deleteRecentScan(r.id, e)}
+                      aria-label={`Remove ${r.targetUsername} from recently analyzed`}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             </>

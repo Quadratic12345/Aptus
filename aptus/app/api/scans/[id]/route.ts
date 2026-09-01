@@ -28,3 +28,15 @@ export async function GET(
     results: JSON.parse(row.resultsJson),
   });
 }
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!idNum) return Response.json({ error: 'invalid id' }, { status: 400 });
+
+  await db.delete(scanHistory).where(eq(scanHistory.id, idNum));
+
+  return Response.json({ ok: true });
+}

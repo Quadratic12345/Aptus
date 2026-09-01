@@ -989,13 +989,26 @@ body {
   max-width:560px; margin:0 auto;
 }
 .recent-chip{
+  display:flex; align-items:center; gap:2px;
+  background:var(--panel); border:1px solid var(--border); border-radius:20px;
+  padding:0; overflow:hidden;
+}
+.recent-chip:hover{border-color:var(--accent);}
+.recent-chip-main{
   display:flex; align-items:center; gap:6px;
   font-family:var(--mono); font-size:11.5px; font-weight:600;
-  background:var(--panel); border:1px solid var(--border); border-radius:20px;
-  padding:5px 12px 5px 6px; color:var(--muted); cursor:pointer;
+  background:transparent; border:none;
+  padding:5px 10px 5px 6px; color:var(--muted); cursor:pointer;
 }
-.recent-chip:hover{border-color:var(--accent); color:var(--text);}
-.recent-chip img{width:18px; height:18px; border-radius:50%;}
+.recent-chip:hover .recent-chip-main{color:var(--text);}
+.recent-chip-main img{width:18px; height:18px; border-radius:50%;}
+.recent-chip-delete{
+  display:flex; align-items:center; justify-content:center;
+  width:20px; height:20px; margin-right:4px;
+  border-radius:50%; border:none; background:transparent;
+  color:var(--dim); font-size:14px; line-height:1; cursor:pointer;
+}
+.recent-chip-delete:hover{background:var(--bad); color:#fff;}
 .star-btn:focus,
 .icon-btn:focus,
 .brand-link:focus{
