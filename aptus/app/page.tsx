@@ -261,8 +261,6 @@ export default function Home() {
 
         let latestProfile: Profile | null = null;
         let latestSkillGraph: typeof skillGraph = null;
-
-          try {
           try {
             const evt = JSON.parse(line);
 
