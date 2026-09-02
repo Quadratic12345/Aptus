@@ -88,10 +88,9 @@ interface GhIssue {
   html_url: string;
   repository_url: string;
   comments: number;
-  labels: {
-    name: string;
-  }[];
+  labels: { name: string }[];
   _matchedLanguage?: string;
+  _popularity?: number;
 }
 
 type GithubErrorKind =
@@ -259,71 +258,38 @@ function randomPage(
   );
 }
 
-async function searchIssuesForLanguage(
-  lang: string,
-  token: string
-): Promise<GhIssue[]> {
-  const base =
-    'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
-
-  const attempts = [
-    `is:issue is:open language:${lang} label:"good first issue" stars:>50`,
-    `is:issue is:open language:${lang} label:"help wanted" stars:>50`,
-    `is:issue is:open language:${lang} stars:>20`,
-    `is:issue is:open language:${lang}`,
+async function searchIssuesForLanguage(lang: string, token: string): Promise<GhIssue[]> {
+  const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
+  const tiers: { query: string; popularity: number }[] = [
+    { query: `is:issue is:open language:${lang} label:"good first issue" stars:>1000`, popularity: 3 },
+    { query: `is:issue is:open language:${lang} label:"help wanted" stars:>1000`, popularity: 3 },
+    { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
+    { query: `is:issue is:open language:${lang} stars:>20`, popularity: 0 },
   ];
 
-  for (const q of attempts) {
+  const collected: GhIssue[] = [];
+  const seenIds = new Set<number>();
+
+  for (const tier of tiers) {
     try {
       const page = randomPage(2);
+      const data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=${page}`, token);
 
-      const data = await ghFetch(
-        `${base}${encodeURIComponent(
-          q
-        )}&page=${page}`,
-        token
-      );
-
-      if (
-        Array.isArray(data.items) &&
-        data.items.length
-      ) {
-        return data.items.map(
-          (it: GhIssue) => ({
-            ...it,
-            _matchedLanguage: lang,
-          })
-        );
+      for (const it of data.items || []) {
+        if (seenIds.has(it.id)) continue;
+        seenIds.add(it.id);
+        collected.push({ ...it, _matchedLanguage: lang, _popularity: tier.popularity });
       }
 
       await delay(120);
-    } catch (error) {
-      /*
-       * A failed search tier should not kill
-       * the entire scan.
-       *
-       * But rate-limit/auth errors are important
-       * and should propagate to the user.
-       */
-      if (
-        error instanceof GithubApiError &&
-        (
-          error.kind ===
-            'RATE_LIMIT' ||
-          error.kind ===
-            'AUTH' ||
-          error.kind ===
-            'FORBIDDEN'
-        )
-      ) {
-        throw error;
-      }
-
-      // Try the next search tier.
+    } catch {
+      /* try next tier */
     }
+
+    if (collected.length >= 12) break; // enough candidates, stop early
   }
 
-  return [];
+  return collected;
 }
 
 function computeDifficulty(
@@ -481,29 +447,11 @@ function computeMatch(
     12
   );
 
-  const labels = (
-    issue.labels || []
-  ).map((l) =>
-    l.name.toLowerCase()
-  );
-
+  const labels = (issue.labels || []).map((l) => l.name.toLowerCase());
   let accessibilityPoints = 0;
-
-  if (
-    labels.some((l) =>
-      l.includes(
-        'good first issue'
-      )
-    )
-  ) {
-    accessibilityPoints += 4;
-  }
-
-  if (
-    (issue.comments || 0) <= 2
-  ) {
-    accessibilityPoints += 3;
-  }
+  if (labels.some((l) => l.includes('good first issue'))) accessibilityPoints += 4;
+  if ((issue.comments || 0) <= 2) accessibilityPoints += 3;
+  accessibilityPoints += (issue._popularity ?? 0) * 3; // small nudge for well-known repos/orgs
 
   const rawScore =
     languagePoints +
