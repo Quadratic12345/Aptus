@@ -262,7 +262,6 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
   const tiers: { query: string; popularity: number }[] = [
     { query: `is:issue is:open language:${lang} label:"good first issue" stars:>1000`, popularity: 3 },
-    { query: `is:issue is:open language:${lang} label:"help wanted" stars:>1000`, popularity: 3 },
     { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
     { query: `is:issue is:open language:${lang} stars:>20`, popularity: 0 },
   ];
@@ -271,6 +270,8 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const seenIds = new Set<number>();
 
   for (const tier of tiers) {
+    if (collected.length >= 8) break; // enough candidates already — stop querying
+
     try {
       const page = randomPage(2);
       const data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=${page}`, token);
@@ -285,8 +286,6 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
     } catch {
       /* try next tier */
     }
-
-    if (collected.length >= 12) break; // enough candidates, stop early
   }
 
   return collected;
@@ -633,7 +632,7 @@ export async function runAnalysis(
             a.updated_at
           ).getTime()
     )
-    .slice(0, 8);
+    .slice(0, 5);
 
   const languageBytes: Record<
     string,

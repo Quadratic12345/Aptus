@@ -1,181 +1,71 @@
 
 import { runAnalysis } from '@/lib/github-matchmaker';
+import { db } from '@/lib/db';
+import { scanHistory } from '@/lib/db/schema';
+import { desc, gte, sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
-export async function POST(
-  req: Request
-) {
-  try {
-    const body =
-      await req.json();
+const CACHE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-    const rawUsername =
-      body?.username;
+export async function POST(req: Request) {
+  const { username } = await req.json();
+  const token = process.env.GITHUB_TOKEN;
 
-    if (
-      !rawUsername ||
-      typeof rawUsername !==
-        'string'
-    ) {
-      return new Response(
-        JSON.stringify({
-          type: 'error',
-          message:
-            'Missing username.',
-        }) + '\n',
-        {
-          status: 400,
-          headers: {
-            'Content-Type':
-              'application/x-ndjson',
-          },
-        }
-      );
-    }
-
-    const username =
-      rawUsername
-        .trim()
-        .replace(/^@/, '');
-
-    if (!username) {
-      return new Response(
-        JSON.stringify({
-          type: 'error',
-          message:
-            'GitHub username is required.',
-        }) + '\n',
-        {
-          status: 400,
-          headers: {
-            'Content-Type':
-              'application/x-ndjson',
-          },
-        }
-      );
-    }
-
-    const token =
-      process.env.GITHUB_TOKEN;
-
-    if (!token) {
-      return new Response(
-        JSON.stringify({
-          type: 'error',
-          message:
-            'GITHUB_TOKEN is not set on the server.',
-        }) + '\n',
-        {
-          status: 500,
-          headers: {
-            'Content-Type':
-              'application/x-ndjson',
-          },
-        }
-      );
-    }
-
-    const stream =
-      new ReadableStream({
-        async start(
-          controller
-        ) {
-          const encoder =
-            new TextEncoder();
-
-          const emit = (
-            obj: Record<
-              string,
-              unknown
-            >
-          ) => {
-            controller.enqueue(
-              encoder.encode(
-                JSON.stringify(
-                  obj
-                ) + '\n'
-              )
-            );
-          };
-
-          try {
-            console.log(
-              `[Aptus] Analyzing GitHub user: ${username}`
-            );
-
-            await runAnalysis(
-              username,
-              token,
-              emit
-            );
-
-            console.log(
-              `[Aptus] Analysis complete: ${username}`
-            );
-          } catch (error) {
-            console.error(
-              '[Aptus] Analysis error:',
-              error
-            );
-
-            if (
-              error instanceof Error &&
-              error.message ===
-                'NOT_FOUND'
-            ) {
-              emit({
-                type: 'error',
-                message: `No GitHub user found for "${username}".`,
-              });
-            } else {
-              emit({
-                type: 'error',
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : 'Unknown GitHub API error.',
-              });
-            }
-          } finally {
-            controller.close();
-          }
-        },
-      });
-
-    return new Response(
-      stream,
-      {
-        status: 200,
-        headers: {
-          'Content-Type':
-            'application/x-ndjson',
-          'Cache-Control':
-            'no-cache, no-transform',
-          Connection:
-            'keep-alive',
-        },
-      }
-    );
-  } catch (error) {
-    console.error(
-      '[Aptus] Request error:',
-      error
-    );
-
-    return new Response(
-      JSON.stringify({
-        type: 'error',
-        message:
-          'Invalid request body.',
-      }) + '\n',
-      {
-        status: 400,
-        headers: {
-          'Content-Type':
-            'application/x-ndjson',
-        },
-      }
-    );
+  if (!token) {
+    return new Response(JSON.stringify({ type: 'error', message: 'GITHUB_TOKEN is not set on the server.' }) + '\n', {
+      status: 500,
+    });
   }
+  if (!username || typeof username !== 'string') {
+    return new Response(JSON.stringify({ type: 'error', message: 'Missing username.' }) + '\n', { status: 400 });
+  }
+
+  const cleanUsername = username.trim().replace(/^@/, '');
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const emit = (obj: Record<string, unknown>) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
+
+      try {
+        // Check for a recent cached scan of this exact username (any user's
+        // past search counts) before touching the GitHub API at all.
+        const cutoff = new Date(Date.now() - CACHE_WINDOW_MS);
+        const cached = await db
+          .select()
+          .from(scanHistory)
+          .where(
+            sql`lower(${scanHistory.targetUsername}) = lower(${cleanUsername}) and ${gte(scanHistory.scannedAt, cutoff)}`
+          )
+          .orderBy(desc(scanHistory.scannedAt))
+          .limit(1);
+
+        if (cached.length > 0) {
+          const row = cached[0];
+          emit({ type: 'status', stage: 0, message: `Using cached scan from ${new Date(row.scannedAt).toLocaleTimeString()}...` });
+          if (row.profileJson) emit({ type: 'profile', data: JSON.parse(row.profileJson) });
+          emit({ type: 'status', stage: 1, message: 'Loading cached skill graph...' });
+          if (row.skillGraphJson) emit({ type: 'skillgraph', data: JSON.parse(row.skillGraphJson) });
+          emit({ type: 'status', stage: 2, message: 'Loading cached matches...' });
+          emit({ type: 'status', stage: 3, message: 'Done.' });
+          emit({ type: 'results', data: JSON.parse(row.resultsJson) });
+          controller.close();
+          return;
+        }
+
+        await runAnalysis(cleanUsername, token, emit);
+      } catch (e) {
+        emit({ type: 'error', message: e instanceof Error && e.message === 'NOT_FOUND'
+          ? `No GitHub user found for "${username}".`
+          : e instanceof Error ? e.message : 'Unknown error' });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' },
+  });
 }
