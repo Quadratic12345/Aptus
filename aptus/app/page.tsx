@@ -351,26 +351,9 @@ export default function Home() {
                 `Done — ${evt.data.length} matches ranked.`
               );
 
-              if (session) {
-                const me = session.user?.name?.trim().replace(/^@/, '') || '';
-                if (me) {
-                  fetch('/api/scans', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      scannedBy: me,
-                      targetUsername: u,
-                      profile: latestProfile,
-                      skillGraph: latestSkillGraph,
-                      results: evt.data,
-                    }),
-                  })
-                    .then(() => fetchRecentScans())
-                    .catch(() => {
-                      // history save is best-effort, never block the UI on it
-                    });
-                }
-              }
+              // Server saves the scan automatically now (signed in or not).
+              // Just refresh the chip list so the new entry shows up.
+              fetchRecentScans();
             } else if (evt.type === 'empty') {
               setEmpty(evt.message);
             } else if (evt.type === 'error') {
