@@ -3,6 +3,7 @@ import { runAnalysis } from '@/lib/github-matchmaker';
 import { db } from '@/lib/db';
 import { scanHistory } from '@/lib/db/schema';
 import { desc, gte, sql } from 'drizzle-orm';
+import { auth } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -29,8 +30,8 @@ export async function POST(req: Request) {
       const emit = (obj: Record<string, unknown>) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
 
       try {
-        // Check for a recent cached scan of this exact username (any user's
-        // past search counts) before touching the GitHub API at all.
+        // 1. Check for a recent cached scan of this exact username, from
+        // ANYONE who searched it — no sign-in required to benefit here.
         const cutoff = new Date(Date.now() - CACHE_WINDOW_MS);
         const cached = await db
           .select()
@@ -54,7 +55,39 @@ export async function POST(req: Request) {
           return;
         }
 
-        await runAnalysis(cleanUsername, token, emit);
+        // 2. No cache hit — run a fresh scan, capturing each piece as it
+        // streams so we can save it once the scan completes.
+        let capturedProfile: unknown = null;
+        let capturedSkillGraph: unknown = null;
+        let capturedResults: unknown = null;
+
+        const wrappedEmit = (obj: Record<string, unknown>) => {
+          if (obj.type === 'profile') capturedProfile = obj.data;
+          else if (obj.type === 'skillgraph') capturedSkillGraph = obj.data;
+          else if (obj.type === 'results') capturedResults = obj.data;
+          emit(obj);
+        };
+
+        await runAnalysis(cleanUsername, token, wrappedEmit);
+
+        // 3. Save the fresh scan for future cache hits — works whether or
+        // not the requester is signed in; falls back to "anonymous".
+        if (capturedResults) {
+          try {
+            const session = await auth.api.getSession({ headers: req.headers });
+            const scannedBy = session?.user?.name?.trim() || 'anonymous';
+
+            await db.insert(scanHistory).values({
+              scannedBy,
+              targetUsername: cleanUsername,
+              profileJson: capturedProfile ? JSON.stringify(capturedProfile) : null,
+              skillGraphJson: capturedSkillGraph ? JSON.stringify(capturedSkillGraph) : null,
+              resultsJson: JSON.stringify(capturedResults),
+            });
+          } catch {
+            // history save is best-effort — never fail the response over it
+          }
+        }
       } catch (e) {
         emit({ type: 'error', message: e instanceof Error && e.message === 'NOT_FOUND'
           ? `No GitHub user found for "${username}".`
