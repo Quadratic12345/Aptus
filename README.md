@@ -76,7 +76,7 @@ flowchart TD
 
     P -->|view history & saved| PR[app/profile/page.tsx]
     PR --> SI
-    PR -->|/api/scans, /api/scans/recent, /api/scans/[id]| SC[scan history routes]
+    PR -->|/api/scans, /api/scans/recent, /api/scans/:id| SC[scan history routes]
     SC --> DB
 
     U -->|Sign in with GitHub| SA[app/sign-in/page.tsx]
