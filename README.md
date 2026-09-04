@@ -9,7 +9,7 @@ for open source
 Not another issue browser. Aptus reads your GitHub repos and pull requests, builds a skill graph from them, and scores live open-source issues against it — so what you see is ranked by fit, not by luck.
 
 
-<img src="place1.png" alt="Aptus landing page" width="800" />
+<img src="./aptus/public/place1.png" alt="Aptus landing page" width="800" />
 
 </div>
 
@@ -50,7 +50,7 @@ Not another issue browser. Aptus reads your GitHub repos and pull requests, buil
 
 | Sign In | Profile — Saved & History |
 |---|---|
-| <img src="place2.png" width="380" /> | <img src="./docs/images/profile.png" width="380" /> |
+| <img src="./aptus/public/place2.png" width="380" /> | <img src="./docs/images/profile.png" width="380" /> |
 
 ---
 
