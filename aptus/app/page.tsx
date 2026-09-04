@@ -395,6 +395,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           username: u,
+          forceRefresh: true,
         }),
       });
 
