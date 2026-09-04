@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 const CACHE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 export async function POST(req: Request) {
-  const { username } = await req.json();
+  const { username, forceRefresh } = await req.json();
   const token = process.env.GITHUB_TOKEN;
 
   if (!token) {
@@ -30,17 +30,17 @@ export async function POST(req: Request) {
       const emit = (obj: Record<string, unknown>) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
 
       try {
-        // 1. Check for a recent cached scan of this exact username, from
-        // ANYONE who searched it — no sign-in required to benefit here.
         const cutoff = new Date(Date.now() - CACHE_WINDOW_MS);
-        const cached = await db
-          .select()
-          .from(scanHistory)
-          .where(
-            sql`lower(${scanHistory.targetUsername}) = lower(${cleanUsername}) and ${gte(scanHistory.scannedAt, cutoff)}`
-          )
-          .orderBy(desc(scanHistory.scannedAt))
-          .limit(1);
+        const cached = forceRefresh
+          ? []
+          : await db
+              .select()
+              .from(scanHistory)
+              .where(
+                sql`lower(${scanHistory.targetUsername}) = lower(${cleanUsername}) and ${gte(scanHistory.scannedAt, cutoff)}`
+              )
+              .orderBy(desc(scanHistory.scannedAt))
+              .limit(1);
 
         if (cached.length > 0) {
           const row = cached[0];
