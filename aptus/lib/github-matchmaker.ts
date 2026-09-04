@@ -261,9 +261,9 @@ function randomPage(
 async function searchIssuesForLanguage(lang: string, token: string): Promise<GhIssue[]> {
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
   const tiers: { query: string; popularity: number }[] = [
-    { query: `is:issue is:open language:${lang} label:"good first issue" stars:>1000`, popularity: 3 },
+    { query: `is:issue is:open language:${lang} stars:>500`, popularity: 3 },
     { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
-    { query: `is:issue is:open language:${lang} stars:>20`, popularity: 0 },
+    { query: `is:issue is:open language:${lang}`, popularity: 0 },
   ];
 
   const collected: GhIssue[] = [];
@@ -450,7 +450,7 @@ function computeMatch(
   let accessibilityPoints = 0;
   if (labels.some((l) => l.includes('good first issue'))) accessibilityPoints += 4;
   if ((issue.comments || 0) <= 2) accessibilityPoints += 3;
-  accessibilityPoints += (issue._popularity ?? 0) * 3; // small nudge for well-known repos/orgs
+  accessibilityPoints += (issue._popularity ?? 0) * 8; // meaningful weight for well-known repos/orgs, not just a nudge
 
   const rawScore =
     languagePoints +
