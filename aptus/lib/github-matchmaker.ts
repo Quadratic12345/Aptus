@@ -928,89 +928,42 @@ export async function runAnalysis(
   /*
    * STEP 8 — Score
    */
-  emit({
-    type: 'status',
-    stage: 3,
-    message:
-      'Scoring compatibility...',
-  });
+   emit({ type: 'status', stage: 3, message: 'Scoring compatibility...' });
+   const scoredAll = allIssues
+     .map((issue) => {
+       const { score, matchedKeywords, prBonusKeywords, breakdown } = computeMatch(issue, skillGraph, prKeywordCounts);
+       const difficulty = computeDifficulty(issue);
+       const probability = computeProbability(score, difficulty);
+       const [lo, hi] = estimateHours(difficulty);
+       return {
+         issue,
+         score,
+         difficulty,
+         probability,
+         estimatedHours: [lo, hi],
+         matchedKeywords,
+         prBonusKeywords,
+         prKeywordCounts,
+         breakdown,
+         repoCount: repoCountByLang[issue._matchedLanguage!] || 0,
+         langShare: languageShare[issue._matchedLanguage!] || 0,
+       };
+     })
+     .sort((a, b) => b.score - a.score);
 
-  const scoredAll =
-    allIssues
-      .map((issue) => {
-        const {
-          score,
-          matchedKeywords,
-          prBonusKeywords,
-          breakdown,
-        } = computeMatch(
-          issue,
-          skillGraph,
-          prKeywordCounts
-        );
+   // Score alone under-represents big/popular repos, since a strong keyword
+   // match from a small repo can easily outscore a weaker-matching issue from
+   // a well-known org. So instead of relying purely on score, reserve a few
+   // guaranteed slots for high-popularity issues, then fill the rest normally.
+   const popularCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 3);
+   const otherCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) < 3);
 
-        const difficulty =
-          computeDifficulty(
-            issue
-          );
+   const guaranteedPopular = popularCandidates.slice(0, 3);
+   const remainingSlots = Math.max(8 - guaranteedPopular.length, 0);
 
-        const probability =
-          computeProbability(
-            score,
-            difficulty
-          );
+   const otherPool = otherCandidates.slice(0, 15);
+   const fillers = shuffle(otherPool).slice(0, remainingSlots);
 
-        const [
-          lo,
-          hi,
-        ] =
-          estimateHours(
-            difficulty
-          );
+   const scored = shuffle([...guaranteedPopular, ...fillers]);
 
-        return {
-          issue,
-          score,
-          difficulty,
-          probability,
-          estimatedHours:
-            [lo, hi] as [
-              number,
-              number
-            ],
-          matchedKeywords,
-          prBonusKeywords,
-          prKeywordCounts,
-          breakdown,
-          repoCount:
-            repoCountByLang[
-              issue
-                ._matchedLanguage!
-            ] || 0,
-          langShare:
-            languageShare[
-              issue
-                ._matchedLanguage!
-            ] || 0,
-        };
-      })
-      .sort(
-        (a, b) =>
-          b.score - a.score
-      );
-
-  /*
-   * Keep the best 15 and randomly surface
-   * 8 of them so refreshes aren't identical.
-   */
-  const pool =
-    scoredAll.slice(0, 15);
-
-  const scored =
-    shuffle(pool).slice(0, 8);
-
-  emit({
-    type: 'results',
-    data: scored,
-  });
-}
+   emit({ type: 'results', data: scored });
