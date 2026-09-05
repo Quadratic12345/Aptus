@@ -33,6 +33,7 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
 
   const githubUsername = session?.user?.name || '';
+  console.log('[Aptus debug] githubUsername used for fetch:', JSON.stringify(githubUsername));
 
   useEffect(() => {
     if (!githubUsername) return;
