@@ -84,6 +84,17 @@ const KNOWN_ORGS = new Set([
   'redis', 'mongodb', 'django', 'pandas-dev', 'scikit-learn', 'flutter',
   'dotnet', 'aws', 'kubernetes-sigs', 'cncf', 'openai', 'huggingface',
 ]);
+const FLAGSHIP_REPOS_BY_LANG: Record<string, string[]> = {
+  Go: ['kubernetes/kubernetes', 'golang/go', 'etcd-io/etcd', 'grafana/grafana', 'hashicorp/terraform', 'prometheus/prometheus'],
+  JavaScript: ['facebook/react', 'vercel/next.js', 'nodejs/node', 'microsoft/vscode', 'angular/angular'],
+  TypeScript: ['microsoft/TypeScript', 'microsoft/vscode', 'vercel/next.js', 'angular/angular', 'nestjs/nest'],
+  Python: ['django/django', 'pandas-dev/pandas', 'tensorflow/tensorflow', 'scikit-learn/scikit-learn', 'huggingface/transformers'],
+  Rust: ['rust-lang/rust', 'tokio-rs/tokio', 'denoland/deno', 'servo/servo'],
+  Java: ['spring-projects/spring-boot', 'elastic/elasticsearch', 'apache/kafka'],
+  'C++': ['tensorflow/tensorflow', 'electron/electron', 'envoyproxy/envoy'],
+  Ruby: ['rails/rails', 'jekyll/jekyll'],
+  PHP: ['laravel/laravel', 'symfony/symfony'],
+};
 
 function orgFromRepoUrl(repoUrl: string): string | null {
   const match = repoUrl.match(/\/repos\/([^/]+)\//);
@@ -263,6 +274,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function capPerRepo<T extends { issue: { repository_url: string } }>(list: T[], maxPerRepo: number): T[] {
+  const counts: Record<string, number> = {};
+  const result: T[] = [];
+  for (const item of list) {
+    const repo = item.issue.repository_url;
+    const count = counts[repo] || 0;
+    if (count < maxPerRepo) {
+      counts[repo] = count + 1;
+      result.push(item);
+    }
+  }
+  return result;
+}
 function randomPage(
   max: number
 ): number {
@@ -275,8 +299,6 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
 
   const tiers: { query: string; popularity: number }[] = [
-    // Broadest possible query for popular repos — no label requirement,
-    // so it actually surfaces big orgs whenever the language matches.
     { query: `is:issue is:open language:${lang} stars:>500`, popularity: 3 },
     { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
     { query: `is:issue is:open language:${lang}`, popularity: 0 },
@@ -286,17 +308,26 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const seenIds = new Set<number>();
 
   for (const tier of tiers) {
-
     let data: { items?: GhIssue[] } | null = null;
+    let page = randomPage(2);
 
     try {
-      const page = randomPage(2);
       data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=${page}`, token);
+
       if (!data?.items?.length && page !== 1) {
         await delay(120);
+        page = 1;
         data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=1`, token);
       }
-    } catch {
+
+      console.log(
+        `[Aptus debug] lang=${lang} popularity=${tier.popularity} page=${page} -> ${data?.items?.length ?? 0} items`
+      );
+    } catch (e) {
+      console.log(
+        `[Aptus debug] lang=${lang} popularity=${tier.popularity} page=${page} -> ERROR:`,
+        e instanceof Error ? e.message : e
+      );
     }
 
     for (const it of data?.items || []) {
@@ -310,7 +341,33 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
 
   return collected;
 }
+async function fetchFlagshipIssues(lang: string, token: string): Promise<GhIssue[]> {
+  const repos = FLAGSHIP_REPOS_BY_LANG[lang];
+  if (!repos || repos.length === 0) return [];
 
+  // Only try 2 repos per language — keeps the extra API cost small and
+  // predictable regardless of how many flagship repos are listed.
+  const picked = shuffle(repos).slice(0, 2);
+  const collected: GhIssue[] = [];
+
+  for (const repo of picked) {
+    try {
+      const q = `repo:${repo} is:issue is:open`;
+      const data = await ghFetch(
+        `https://api.github.com/search/issues?per_page=10&sort=comments&order=desc&q=${encodeURIComponent(q)}`,
+        token
+      );
+      for (const it of data.items || []) {
+        collected.push({ ...it, _matchedLanguage: lang, _popularity: 5 });
+      }
+    } catch {
+      /* skip this repo */
+    }
+    await delay(120);
+  }
+
+  return collected;
+}
 function computeDifficulty(
   issue: GhIssue
 ): number {
@@ -859,6 +916,7 @@ export async function runAnalysis(
   if (topLangs.length === 0) {
     topLangs =
       topLangsAll.slice(0, 3);
+    console.log('[Aptus debug] top languages chosen for search:', topLangs);
   }
 
   if (topLangs.length === 0) {
@@ -889,6 +947,15 @@ export async function runAnalysis(
         ...issues
       );
 
+
+      await delay(150);
+
+     try {
+        allIssues.push(...(await fetchFlagshipIssues(lang, token)));
+     }catch {
+           /* skip flagship repos for this language */
+         }
+
       await delay(150);
     } catch (error) {
       /*
@@ -914,18 +981,18 @@ export async function runAnalysis(
   /*
    * Remove duplicate issues.
    */
-   const seen = new Set<number>();
-   allIssues = allIssues.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
+  const seen = new Set<number>();
+  allIssues = allIssues.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
 
-   // Explicitly recognize well-known orgs by name, on top of the generic
-   // star-count popularity tiers — catches cases where a big org's repo
-   // might not clear the star threshold for some reason.
-   for (const issue of allIssues) {
-     const org = orgFromRepoUrl(issue.repository_url);
-     if (org && KNOWN_ORGS.has(org)) {
-       issue._popularity = 5;
-     }
-   }
+  // Explicitly recognize well-known orgs by name, on top of the generic
+  // star-count popularity tiers — catches cases where a big org's repo
+  // might not clear the star threshold for some reason.
+  for (const issue of allIssues) {
+    const org = orgFromRepoUrl(issue.repository_url);
+    if (org && KNOWN_ORGS.has(org)) {
+      issue._popularity = 5;
+    }
+  }
   /*
    * STEP 8 — Score
    */
@@ -956,8 +1023,10 @@ export async function runAnalysis(
   // match from a small repo can easily outscore a weaker-matching issue from
   // a well-known org. So instead of relying purely on score, reserve a few
   // guaranteed slots for high-popularity issues, then fill the rest normally.
+  const diversePool = capPerRepo(scoredAll, 2);
+
   const knownOrgCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 5);
-  const popularCandidates = scoredAll.filter((s) => {
+  const popularCandidates = diversePool.filter((s) => {
     const p = s.issue._popularity ?? 0;
     return p >= 3 && p < 5;
   });
@@ -977,6 +1046,12 @@ export async function runAnalysis(
   const fillers = shuffle(otherPool).slice(0, remainingSlots);
 
   const scored = shuffle([...guaranteedPopular, ...fillers]);
+
+  console.log('[Aptus debug] diversePool size:', diversePool.length);
+  console.log('[Aptus debug] knownOrgCandidates:', knownOrgCandidates.map((s) => s.issue.repository_url));
+  console.log('[Aptus debug] popularCandidates (>=3,<5):', popularCandidates.map((s) => s.issue.repository_url));
+  console.log('[Aptus debug] guaranteedPopular repos:', guaranteedPopular.map((s) => s.issue.repository_url));
+  console.log('[Aptus debug] final scored repos:', scored.map((s) => s.issue.repository_url));
 
   emit({ type: 'results', data: scored });
 }

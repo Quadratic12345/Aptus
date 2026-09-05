@@ -51,10 +51,8 @@ export async function POST(req: Request) {
           emit({ type: 'status', stage: 2, message: 'Loading cached matches...' });
           emit({ type: 'status', stage: 3, message: 'Done.' });
           emit({ type: 'results', data: JSON.parse(row.resultsJson) });
-          controller.close();
-          return;
+          return; // the outer `finally` closes the controller — don't close it here too
         }
-
         // 2. No cache hit — run a fresh scan, capturing each piece as it
         // streams so we can save it once the scan completes.
         let capturedProfile: unknown = null;
