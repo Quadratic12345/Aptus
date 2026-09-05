@@ -58,9 +58,10 @@ export default function ProfilePage() {
         }
 
         if (!res.ok) {
-          const message =
-            (data && typeof data === 'object' && 'error' in data && String((data as { error: unknown }).error)) ||
-            `History API failed with status ${res.status}`;
+          let message = `History API failed with status ${res.status}`;
+          if (data && typeof data === 'object' && 'error' in data) {
+            message = String((data as { error: unknown }).error);
+          }
           throw new Error(message);
         }
 
