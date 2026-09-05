@@ -273,7 +273,6 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const seenIds = new Set<number>();
 
   for (const tier of tiers) {
-    if (collected.length >= 8) break;
 
     let data: { items?: GhIssue[] } | null = null;
 
