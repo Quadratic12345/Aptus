@@ -37,7 +37,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!githubUsername) return;
 
-    fetch(`/api/issues/saved?username=${encodeURIComponent(githubUsername)}`)
+      fetch(`/api/scans?scannedBy=${encodeURIComponent(githubUsername)}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => setError('Could not load saved issues.'));

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import { scanHistory } from '@/lib/db/schema';
 import { desc, gte } from 'drizzle-orm';
