@@ -299,9 +299,6 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   return collected;
 }
 
-  return collected;
-}
-
 function computeDifficulty(
   issue: GhIssue
 ): number {
