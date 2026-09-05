@@ -2,6 +2,7 @@
 import { useSession } from '@/lib/auth-client';
 import GithubIcon from '@/components/ui/github-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
+import HistoryCircleIcon from '@/components/ui/history-circle-icon';
 import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo, useEffect } from 'react';
 
@@ -776,7 +777,8 @@ export default function Home() {
                 {session.user.name || 'My Profile'}
               </Link>
             ) : (
-              <Link className="star-btn pill-white" href="/sign-in">
+                <Link className="star-btn pill-white" href="/sign-in">
+                  <HistoryCircleIcon/>
                 History
               </Link>
             )}
