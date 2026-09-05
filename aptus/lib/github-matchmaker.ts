@@ -76,6 +76,19 @@ const EXCLUDE_FROM_SEARCH = new Set([
   'Markdown',
   'Jupyter Notebook',
 ]);
+const KNOWN_ORGS = new Set([
+  'kubernetes', 'facebook', 'microsoft', 'google', 'googlecloudplatform',
+  'apache', 'tensorflow', 'nodejs', 'golang', 'rust-lang', 'docker',
+  'hashicorp', 'elastic', 'grafana', 'prometheus', 'envoyproxy', 'vercel',
+  'angular', 'vuejs', 'facebookresearch', 'pytorch', 'spring-projects',
+  'redis', 'mongodb', 'django', 'pandas-dev', 'scikit-learn', 'flutter',
+  'dotnet', 'aws', 'kubernetes-sigs', 'cncf', 'openai', 'huggingface',
+]);
+
+function orgFromRepoUrl(repoUrl: string): string | null {
+  const match = repoUrl.match(/\/repos\/([^/]+)\//);
+  return match ? match[1].toLowerCase() : null;
+}
 
 export type Emit = (
   event: Record<string, unknown>
@@ -901,24 +914,18 @@ export async function runAnalysis(
   /*
    * Remove duplicate issues.
    */
-  const seen =
-    new Set<number>();
+   const seen = new Set<number>();
+   allIssues = allIssues.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
 
-  allIssues =
-    allIssues.filter(
-      (issue) => {
-        if (
-          seen.has(issue.id)
-        ) {
-          return false;
-        }
-
-        seen.add(issue.id);
-
-        return true;
-      }
-    );
-
+   // Explicitly recognize well-known orgs by name, on top of the generic
+   // star-count popularity tiers — catches cases where a big org's repo
+   // might not clear the star threshold for some reason.
+   for (const issue of allIssues) {
+     const org = orgFromRepoUrl(issue.repository_url);
+     if (org && KNOWN_ORGS.has(org)) {
+       issue._popularity = 5;
+     }
+   }
   /*
    * STEP 8 — Score
    */
