@@ -602,10 +602,10 @@ export async function runAnalysis(
   const nonForks =
     Array.isArray(repos)
       ? repos.filter(
-          (r: {
-            fork: boolean;
-          }) => !r.fork
-        )
+        (r: {
+          fork: boolean;
+        }) => !r.fork
+      )
       : [];
 
   if (nonForks.length === 0) {
@@ -632,13 +632,13 @@ export async function runAnalysis(
     .sort(
       (a, b) =>
         (b.stargazers_count || 0) -
-          (a.stargazers_count || 0) ||
+        (a.stargazers_count || 0) ||
         new Date(
           b.updated_at
         ).getTime() -
-          new Date(
-            a.updated_at
-          ).getTime()
+        new Date(
+          a.updated_at
+        ).getTime()
     )
     .slice(0, 5);
 
@@ -689,11 +689,11 @@ export async function runAnalysis(
         error instanceof GithubApiError &&
         (
           error.kind ===
-            'RATE_LIMIT' ||
+          'RATE_LIMIT' ||
           error.kind ===
-            'AUTH' ||
+          'AUTH' ||
           error.kind ===
-            'FORBIDDEN'
+          'FORBIDDEN'
         )
       ) {
         throw error;
@@ -701,10 +701,9 @@ export async function runAnalysis(
     }
 
     for (const k of extractKeywords(
-      `${repo.description || ''} ${
-        (repo.topics || []).join(
-          ' '
-        )
+      `${repo.description || ''} ${(repo.topics || []).join(
+        ' '
+      )
       } ${repo.name}`
     )) {
       keywordSet.add(k);
@@ -761,8 +760,7 @@ export async function runAnalysis(
     for (const pr of
       prData.items || []) {
       for (const k of extractKeywords(
-        `${pr.title || ''} ${
-          pr.body || ''
+        `${pr.title || ''} ${pr.body || ''
         }`
       )) {
         prKeywordCounts[k] =
@@ -781,11 +779,11 @@ export async function runAnalysis(
       error instanceof GithubApiError &&
       (
         error.kind ===
-          'RATE_LIMIT' ||
+        'RATE_LIMIT' ||
         error.kind ===
-          'AUTH' ||
+        'AUTH' ||
         error.kind ===
-          'FORBIDDEN'
+        'FORBIDDEN'
       )
     ) {
       throw error;
@@ -889,11 +887,11 @@ export async function runAnalysis(
         error instanceof GithubApiError &&
         (
           error.kind ===
-            'RATE_LIMIT' ||
+          'RATE_LIMIT' ||
           error.kind ===
-            'AUTH' ||
+          'AUTH' ||
           error.kind ===
-            'FORBIDDEN'
+          'FORBIDDEN'
         )
       ) {
         throw error;
@@ -925,42 +923,43 @@ export async function runAnalysis(
   /*
    * STEP 8 — Score
    */
-   emit({ type: 'status', stage: 3, message: 'Scoring compatibility...' });
-   const scoredAll = allIssues
-     .map((issue) => {
-       const { score, matchedKeywords, prBonusKeywords, breakdown } = computeMatch(issue, skillGraph, prKeywordCounts);
-       const difficulty = computeDifficulty(issue);
-       const probability = computeProbability(score, difficulty);
-       const [lo, hi] = estimateHours(difficulty);
-       return {
-         issue,
-         score,
-         difficulty,
-         probability,
-         estimatedHours: [lo, hi],
-         matchedKeywords,
-         prBonusKeywords,
-         prKeywordCounts,
-         breakdown,
-         repoCount: repoCountByLang[issue._matchedLanguage!] || 0,
-         langShare: languageShare[issue._matchedLanguage!] || 0,
-       };
-     })
-     .sort((a, b) => b.score - a.score);
+  emit({ type: 'status', stage: 3, message: 'Scoring compatibility...' });
+  const scoredAll = allIssues
+    .map((issue) => {
+      const { score, matchedKeywords, prBonusKeywords, breakdown } = computeMatch(issue, skillGraph, prKeywordCounts);
+      const difficulty = computeDifficulty(issue);
+      const probability = computeProbability(score, difficulty);
+      const [lo, hi] = estimateHours(difficulty);
+      return {
+        issue,
+        score,
+        difficulty,
+        probability,
+        estimatedHours: [lo, hi],
+        matchedKeywords,
+        prBonusKeywords,
+        prKeywordCounts,
+        breakdown,
+        repoCount: repoCountByLang[issue._matchedLanguage!] || 0,
+        langShare: languageShare[issue._matchedLanguage!] || 0,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 
-   // Score alone under-represents big/popular repos, since a strong keyword
-   // match from a small repo can easily outscore a weaker-matching issue from
-   // a well-known org. So instead of relying purely on score, reserve a few
-   // guaranteed slots for high-popularity issues, then fill the rest normally.
-   const popularCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 3);
-   const otherCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) < 3);
+  // Score alone under-represents big/popular repos, since a strong keyword
+  // match from a small repo can easily outscore a weaker-matching issue from
+  // a well-known org. So instead of relying purely on score, reserve a few
+  // guaranteed slots for high-popularity issues, then fill the rest normally.
+  const popularCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 3);
+  const otherCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) < 3);
 
-   const guaranteedPopular = popularCandidates.slice(0, 3);
-   const remainingSlots = Math.max(8 - guaranteedPopular.length, 0);
+  const guaranteedPopular = popularCandidates.slice(0, 3);
+  const remainingSlots = Math.max(8 - guaranteedPopular.length, 0);
 
-   const otherPool = otherCandidates.slice(0, 15);
-   const fillers = shuffle(otherPool).slice(0, remainingSlots);
+  const otherPool = otherCandidates.slice(0, 15);
+  const fillers = shuffle(otherPool).slice(0, remainingSlots);
 
-   const scored = shuffle([...guaranteedPopular, ...fillers]);
+  const scored = shuffle([...guaranteedPopular, ...fillers]);
 
-   emit({ type: 'results', data: scored });
+  emit({ type: 'results', data: scored });
+}
