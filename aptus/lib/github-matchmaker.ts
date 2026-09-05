@@ -260,7 +260,10 @@ function randomPage(
 
 async function searchIssuesForLanguage(lang: string, token: string): Promise<GhIssue[]> {
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
+
   const tiers: { query: string; popularity: number }[] = [
+    // Broadest possible query for popular repos — no label requirement,
+    // so it actually surfaces big orgs whenever the language matches.
     { query: `is:issue is:open language:${lang} stars:>500`, popularity: 3 },
     { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
     { query: `is:issue is:open language:${lang}`, popularity: 0 },
@@ -270,23 +273,31 @@ async function searchIssuesForLanguage(lang: string, token: string): Promise<GhI
   const seenIds = new Set<number>();
 
   for (const tier of tiers) {
-    if (collected.length >= 8) break; // enough candidates already — stop querying
+    if (collected.length >= 8) break;
+
+    let data: { items?: GhIssue[] } | null = null;
 
     try {
       const page = randomPage(2);
-      const data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=${page}`, token);
-
-      for (const it of data.items || []) {
-        if (seenIds.has(it.id)) continue;
-        seenIds.add(it.id);
-        collected.push({ ...it, _matchedLanguage: lang, _popularity: tier.popularity });
+      data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=${page}`, token);
+      if (!data?.items?.length && page !== 1) {
+        await delay(120);
+        data = await ghFetch(`${base}${encodeURIComponent(tier.query)}&page=1`, token);
       }
-
-      await delay(120);
     } catch {
-      /* try next tier */
     }
+
+    for (const it of data?.items || []) {
+      if (seenIds.has(it.id)) continue;
+      seenIds.add(it.id);
+      collected.push({ ...it, _matchedLanguage: lang, _popularity: tier.popularity });
+    }
+
+    await delay(120);
   }
+
+  return collected;
+}
 
   return collected;
 }
