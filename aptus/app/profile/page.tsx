@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -31,9 +30,9 @@ export default function ProfilePage() {
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [historyError, setHistoryError] = useState('');
 
   const githubUsername = session?.user?.name || '';
-  console.log('[Aptus debug] githubUsername used for fetch:', JSON.stringify(githubUsername));
 
   useEffect(() => {
     if (!githubUsername) return;
@@ -43,10 +42,38 @@ export default function ProfilePage() {
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => setError('Could not load saved issues.'));
 
+    // History fetch checks res.ok explicitly and surfaces the real error —
+    // a 500 with a JSON error body still resolves fine as far as fetch()
+    // is concerned, so silently checking Array.isArray() alone hides the
+    // actual failure behind a plain "no history" empty state.
     fetch(`/api/scans?scannedBy=${encodeURIComponent(githubUsername)}`)
-      .then((res) => res.json())
-      .then((data) => setHistory(Array.isArray(data) ? data : []))
-      .catch(() => setError('Could not load search history.'));
+      .then(async (res) => {
+        const text = await res.text();
+        let data: unknown;
+
+        try {
+          data = text.trim() ? JSON.parse(text) : [];
+        } catch {
+          throw new Error(`History API returned invalid JSON (status ${res.status}): ${text.slice(0, 200)}`);
+        }
+
+        if (!res.ok) {
+          const message =
+            (data && typeof data === 'object' && 'error' in data && String((data as { error: unknown }).error)) ||
+            `History API failed with status ${res.status}`;
+          throw new Error(message);
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error('History API did not return an array.');
+        }
+
+        setHistory(data);
+      })
+      .catch((e) => {
+        setHistoryError(e instanceof Error ? e.message : 'Could not load search history.');
+        setHistory([]);
+      });
   }, [githubUsername]);
 
   async function unsave(issueUrl: string) {
@@ -96,6 +123,7 @@ export default function ProfilePage() {
         </div>
 
         {error && <div className="err">&gt; {error}</div>}
+        {historyError && <div className="err">&gt; Search history error: {historyError}</div>}
 
         {items && (
           <>
@@ -192,7 +220,7 @@ export default function ProfilePage() {
                 ))}
               </div>
             ) : (
-              session && <div className="empty">No searches yet — scan a username on the main page.</div>
+              !historyError && session && <div className="empty">No searches yet — scan a username on the main page.</div>
             )}
           </>
         )}
