@@ -956,10 +956,21 @@ export async function runAnalysis(
   // match from a small repo can easily outscore a weaker-matching issue from
   // a well-known org. So instead of relying purely on score, reserve a few
   // guaranteed slots for high-popularity issues, then fill the rest normally.
-  const popularCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 3);
+  const knownOrgCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 5);
+  const popularCandidates = scoredAll.filter((s) => {
+    const p = s.issue._popularity ?? 0;
+    return p >= 3 && p < 5;
+  });
   const otherCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) < 3);
 
-  const guaranteedPopular = popularCandidates.slice(0, 3);
+  // Priority: named big orgs first, then generic high-star repos, filling
+  // up to a minimum popular total, then the rest from the normal pool.
+  const guaranteedKnownOrg = knownOrgCandidates.slice(0, 2);
+  const MIN_POPULAR_SLOTS = 2;
+  const stillNeeded = Math.max(MIN_POPULAR_SLOTS - guaranteedKnownOrg.length, 0);
+  const guaranteedGeneric = popularCandidates.slice(0, stillNeeded);
+
+  const guaranteedPopular = [...guaranteedKnownOrg, ...guaranteedGeneric];
   const remainingSlots = Math.max(8 - guaranteedPopular.length, 0);
 
   const otherPool = otherCandidates.slice(0, 15);
