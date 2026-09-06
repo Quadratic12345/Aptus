@@ -3,6 +3,15 @@ import { useSession } from '@/lib/auth-client';
 import GithubIcon from '@/components/ui/github-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import HistoryCircleIcon from '@/components/ui/history-circle-icon';
+import type { AnimatedIconHandle } from '@/components/ui/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { XIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo, useEffect } from 'react';
 
@@ -75,6 +84,15 @@ const SEGMENT_COLORS = [
   'var(--mid)',
 ];
 
+const SORT_OPTIONS = [
+  { value: 'match', label: 'Best match' },
+  { value: 'easiest', label: 'Easiest first' },
+  { value: 'fastest', label: 'Fastest' },
+  { value: 'probability', label: 'Highest probability' },
+] as const;
+
+type SortBy = (typeof SORT_OPTIONS)[number]['value'];
+
 export default function Home() {
   const { data: session } = useSession();
 
@@ -96,9 +114,7 @@ export default function Home() {
 
 
 
-  const [sortBy, setSortBy] = useState<
-    'match' | 'easiest' | 'fastest' | 'probability'
-  >('match');
+  const [sortBy, setSortBy] = useState<SortBy>('match');
 
 
   const [activeLangs, setActiveLangs] = useState<Set<string>>(
@@ -184,6 +200,7 @@ export default function Home() {
     }
   }
   const [refreshing, setRefreshing] = useState(false);
+  const refreshIconRef = useRef<AnimatedIconHandle>(null);
 
   useEffect(() => {
     fetch('https://api.github.com/repos/Quadratic12345/Aptus')
@@ -829,11 +846,12 @@ export default function Home() {
                     </button>
 
                     <button
+                      type="button"
                       className="recent-chip-delete"
                       onClick={(e) => deleteRecentScan(r.id, e)}
                       aria-label={`Remove ${r.targetUsername} from recently analyzed`}
                     >
-                      ×
+                      <XIcon size={12} strokeWidth={2.5} aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -887,34 +905,36 @@ export default function Home() {
         </div>
 
         {profile && (
-          <div className="block">
-            <div className="block-label">
+          <div className="block profile-card">
+            <div className="block-label profile-card-label">
               ◈ Developer
             </div>
 
             <div className="profile-row">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="avatar"
-                src={profile.avatarUrl}
-                alt={profile.login}
-              />
+              <div className="profile-identity">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="avatar"
+                  src={profile.avatarUrl}
+                  alt={profile.login}
+                />
 
-              <div className="profile-info">
-                <div className="profile-name">
-                  {profile.name ||
-                    profile.login}
+                <div className="profile-info">
+                  <div className="profile-name">
+                    {profile.name ||
+                      profile.login}
+                  </div>
+
+                  <div className="profile-login">
+                    @{profile.login}
+                  </div>
+
+                  {profile.bio && (
+                    <p className="profile-bio">
+                      {profile.bio}
+                    </p>
+                  )}
                 </div>
-
-                <div className="profile-login">
-                  @{profile.login}
-                </div>
-
-                {profile.bio && (
-                  <p className="profile-bio">
-                    {profile.bio}
-                  </p>
-                )}
               </div>
 
               <div className="profile-stats">
@@ -933,7 +953,7 @@ export default function Home() {
                 </div>
               </div>
 
-            <a
+              <a
                 className="profile-link"
                 href={profile.htmlUrl}
                 target="_blank"
@@ -1031,11 +1051,21 @@ export default function Home() {
 
               <div className="toolbar-controls">
                 <button
-                  className="chip"
+                  className="chip refresh-chip"
                   onClick={refreshResults}
+                  onMouseEnter={() =>
+                    refreshIconRef.current?.startAnimation()
+                  }
+                  onMouseLeave={() =>
+                    refreshIconRef.current?.stopAnimation()
+                  }
                   disabled={refreshing}
                 >
-                  <RefreshIcon />
+                  <RefreshIcon
+                    ref={refreshIconRef}
+                    size={14}
+                    className="pointer-events-none"
+                  />
                   {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
 
@@ -1060,32 +1090,42 @@ export default function Home() {
                   )
                 )}
 
-                <select
-                  className="select"
+                <Select
+                  items={SORT_OPTIONS}
                   value={sortBy}
-                  onChange={(e) =>
-                    setSortBy(
-                      e.target
-                        .value as typeof sortBy
-                    )
-                  }
+                  onValueChange={(value) => {
+                    if (value) setSortBy(value);
+                  }}
                 >
-                  <option value="match">
-                    Best match
-                  </option>
-
-                  <option value="easiest">
-                    Easiest first
-                  </option>
-
-                  <option value="fastest">
-                    Fastest
-                  </option>
-
-                  <option value="probability">
-                    Highest probability
-                  </option>
-                </select>
+                  <SelectTrigger
+                    className="select min-w-44"
+                    aria-label="Sort results"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    side="bottom"
+                    sideOffset={8}
+                    align="start"
+                    alignItemWithTrigger={false}
+                    collisionAvoidance={{
+                      side: 'none',
+                      align: 'shift',
+                      fallbackAxisSide: 'none',
+                    }}
+                    className="w-max min-w-(--anchor-width) p-1 font-[var(--mono)]"
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="py-2 text-[11.5px] font-semibold"
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

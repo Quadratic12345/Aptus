@@ -334,72 +334,111 @@ h1{
   margin:0 0 16px;
 }
 
+.profile-card{
+  padding:28px;
+  border-radius:16px;
+  background:var(--panel);
+}
+
+.profile-card-label{
+  display:inline-flex;
+  align-items:center;
+  width:fit-content;
+  margin:0 0 24px;
+  padding:7px 11px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:var(--panel-2);
+  color:var(--accent);
+  line-height:1;
+}
+
 .profile-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:28px;
+}
+
+.profile-identity{
   display:flex;
   align-items:center;
-  gap:18px;
-  flex-wrap:wrap;
+  min-width:0;
+  gap:20px;
 }
 
 .avatar{
-  width:60px;
-  height:60px;
+  width:76px;
+  height:76px;
   border-radius:50%;
   border:2px solid var(--accent);
+  box-shadow:0 0 0 4px var(--panel-2);
   object-fit:cover;
   flex-shrink:0;
 }
 
 .profile-info{
-  flex:1;
-  min-width:180px;
+  min-width:0;
 }
 
 .profile-name{
   font-family:var(--display);
   font-weight:700;
-  font-size:18px;
-  margin:0 0 2px;
+  font-size:24px;
+  line-height:1.15;
+  letter-spacing:-.02em;
+  margin:0 0 5px;
 }
 
 .profile-login{
   font-family:var(--mono);
   font-weight:600;
-  font-size:12px;
-  color:var(--dim);
-  margin:0 0 6px;
+  font-size:12.5px;
+  color:var(--accent);
+  margin:0 0 10px;
 }
 
 .profile-bio{
-  font-size:13px;
+  max-width:470px;
+  font-size:13.5px;
   font-weight:500;
   color:var(--muted);
-  line-height:1.5;
+  line-height:1.55;
   margin:0;
 }
 
 .profile-stats{
-  display:flex;
-  gap:20px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(72px,1fr));
+  gap:12px;
+  padding-left:28px;
+  border-left:1px solid var(--border);
 }
 
 .profile-stat{
   font-family:var(--mono);
-  text-align:center;
+  min-width:72px;
+  padding:6px 10px;
+  text-align:left;
 }
 
 .profile-stat b{
   display:block;
-  font-size:18px;
+  font-family:var(--display);
+  font-size:28px;
   font-weight:700;
+  line-height:1;
+  letter-spacing:-.03em;
   color:var(--text);
+  margin-bottom:7px;
 }
 
 .profile-stat span{
+  display:block;
   font-size:9.5px;
   color:var(--dim);
   text-transform:uppercase;
-  letter-spacing:.05em;
+  letter-spacing:.09em;
   font-weight:700;
 }
 
@@ -409,13 +448,25 @@ h1{
   gap:6px;
   font-family:var(--mono);
   font-weight:700;
-  font-size:11.5px;
+  font-size:12px;
   color:var(--accent-ink);
   background:var(--accent);
-  border-radius:7px;
-  padding:8px 14px;
+  border-radius:999px;
+  padding:12px 18px;
   text-decoration:none;
   flex-shrink:0;
+  white-space:nowrap;
+  transition:transform .15s ease,filter .15s ease;
+}
+
+.profile-link:hover{
+  filter:brightness(1.08);
+  transform:translateY(-1px);
+}
+
+.profile-link:focus-visible{
+  outline:2px solid var(--text);
+  outline-offset:3px;
 }
 
 .lang-row{
@@ -533,6 +584,19 @@ h1{
   border-color:var(--accent);
   background:var(--accent);
   color:var(--accent-ink);
+}
+
+.refresh-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  line-height:1;
+  white-space:nowrap;
+}
+
+.refresh-chip svg{
+  flex:none;
 }
 
 /* results grid */
@@ -768,6 +832,23 @@ h1{
   line-height:1.6;
 }
 
+@media (max-width:860px){
+  .profile-row{
+    grid-template-columns:minmax(0,1fr) auto;
+  }
+
+  .profile-identity{
+    grid-column:1 / -1;
+  }
+
+  .profile-stats{
+    padding-top:20px;
+    padding-left:0;
+    border-top:1px solid var(--border);
+    border-left:0;
+  }
+}
+
 @media (max-width:640px){
   .stat-grid{
     grid-template-columns:repeat(2,1fr);
@@ -777,9 +858,46 @@ h1{
     grid-template-columns:1fr;
   }
 
+  .profile-card{
+    padding:20px;
+  }
+
+  .profile-card-label{
+    margin-bottom:20px;
+  }
+
   .profile-row{
-    flex-direction:column;
+    grid-template-columns:1fr;
+    gap:22px;
+  }
+
+  .profile-identity{
+    grid-column:auto;
     align-items:flex-start;
+    gap:16px;
+  }
+
+  .avatar{
+    width:64px;
+    height:64px;
+  }
+
+  .profile-name{
+    font-size:20px;
+  }
+
+  .profile-stats{
+    grid-template-columns:repeat(2,1fr);
+    width:100%;
+  }
+
+  .profile-stat{
+    padding:2px 0;
+  }
+
+  .profile-link{
+    justify-content:center;
+    width:100%;
   }
 }
 
@@ -1005,9 +1123,11 @@ body {
 .recent-chip-delete{
   display:flex; align-items:center; justify-content:center;
   width:20px; height:20px; margin-right:4px;
+  padding:0; flex:0 0 20px;
   border-radius:50%; border:none; background:transparent;
-  color:var(--dim); font-size:14px; line-height:1; cursor:pointer;
+  color:var(--dim); cursor:pointer;
 }
+.recent-chip-delete svg{display:block;}
 .recent-chip-delete:hover{background:var(--bad); color:#fff;}
 .star-btn:focus,
 .icon-btn:focus,
