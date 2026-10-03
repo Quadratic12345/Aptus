@@ -294,14 +294,20 @@ function randomPage(
     Math.floor(Math.random() * max) + 1
   );
 }
+function recentCutoffDate(monthsAgo: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsAgo);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
 async function searchIssuesForLanguage(lang: string, token: string): Promise<GhIssue[]> {
   const base = 'https://api.github.com/search/issues?per_page=15&sort=created&order=desc&q=';
 
+  const cutoff = recentCutoffDate(6); // only issues created in the last 6 months
   const tiers: { query: string; popularity: number }[] = [
-    { query: `is:issue is:open language:${lang} stars:>500`, popularity: 3 },
-    { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50`, popularity: 1 },
-    { query: `is:issue is:open language:${lang}`, popularity: 0 },
+    { query: `is:issue is:open language:${lang} stars:>500 created:>=${cutoff}`, popularity: 3 },
+    { query: `is:issue is:open language:${lang} label:"good first issue" stars:>50 created:>=${cutoff}`, popularity: 1 },
+    { query: `is:issue is:open language:${lang} created:>=${cutoff}`, popularity: 0 },
   ];
 
   const collected: GhIssue[] = [];
@@ -350,9 +356,11 @@ async function fetchFlagshipIssues(lang: string, token: string): Promise<GhIssue
   const picked = shuffle(repos).slice(0, 2);
   const collected: GhIssue[] = [];
 
+  const cutoff = recentCutoffDate(18);
+
   for (const repo of picked) {
     try {
-      const q = `repo:${repo} is:issue is:open`;
+       const q = `repo:${repo} is:issue is:open created:>=${cutoff}`;
       const data = await ghFetch(
         `https://api.github.com/search/issues?per_page=10&sort=comments&order=desc&q=${encodeURIComponent(q)}`,
         token
