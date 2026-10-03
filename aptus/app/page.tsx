@@ -1,4 +1,6 @@
+
 'use client';
+
 import { useSession } from '@/lib/auth-client';
 import GithubIcon from '@/components/ui/github-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
@@ -53,6 +55,7 @@ type SavedIssue = {
   difficulty: number | null;
   savedAt: string;
 };
+
 type RecentScan = {
   id: number;
   targetUsername: string;
@@ -94,12 +97,9 @@ export default function Home() {
 
   const [results, setResults] = useState<Scored[] | null>(null);
 
-
-
   const [sortBy, setSortBy] = useState<
     'match' | 'easiest' | 'fastest' | 'probability'
   >('match');
-
 
   const [activeLangs, setActiveLangs] = useState<Set<string>>(
     new Set()
@@ -116,7 +116,7 @@ export default function Home() {
   const [recentScans, setRecentScans] = useState<RecentScan[] | null>(null);
 
   function fetchRecentScans() {
-    fetch('/api/scans/recent')
+    fetch('/api/device-scans/recent')
       .then((res) => res.json())
       .then((data) => setRecentScans(Array.isArray(data) ? data : []))
       .catch(() => setRecentScans([]));
@@ -127,7 +127,6 @@ export default function Home() {
   }, []);
 
   const [loadingCacheId, setLoadingCacheId] = useState<number | null>(null);
-
 
   async function deleteRecentScan(
     id: number,
@@ -141,7 +140,7 @@ export default function Home() {
     );
 
     try {
-      const res = await fetch(`/api/scans/${id}`, {
+      const res = await fetch(`/api/device-scans/${id}`, {
         method: 'DELETE',
       });
 
@@ -161,9 +160,11 @@ export default function Home() {
     setEmpty('');
 
     try {
+      const res = await fetch(`/api/device-scans/${entry.id}`);
 
-      const res = await fetch(`/api/scans/${entry.id}`);
-      if (!res.ok) throw new Error('Could not load cached scan.');
+      if (!res.ok) {
+        throw new Error('Could not load cached scan.');
+      }
 
       const data = await res.json();
 
@@ -172,24 +173,36 @@ export default function Home() {
       setSkillGraph(data.skillGraph);
       setResults(data.results);
       setStage(3);
+
       setStatus(
-        `Loaded from cache — scanned ${new Date(data.scannedAt).toLocaleDateString()}.`
+        `Loaded from cache — scanned ${new Date(
+          data.scannedAt
+        ).toLocaleDateString()}.`
       );
 
       loadSavedIssues(data.targetUsername);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load cached scan.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not load cached scan.'
+      );
     } finally {
       setLoadingCacheId(null);
     }
   }
+
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetch('https://api.github.com/repos/Quadratic12345/Aptus')
       .then((res) => res.json())
       .then((data) =>
-        setStars(typeof data.stargazers_count === 'number' ? data.stargazers_count : null)
+        setStars(
+          typeof data.stargazers_count === 'number'
+            ? data.stargazers_count
+            : null
+        )
       )
       .catch(() => setStars(null));
   }, []);
@@ -380,6 +393,7 @@ export default function Home() {
       setLoading(false);
     }
   }
+
   async function refreshResults() {
     const u = username.trim().replace(/^@/, '');
 
@@ -435,7 +449,9 @@ export default function Home() {
 
             if (evt.type === 'results') {
               setResults(evt.data);
-              setStatus(`Refreshed — ${evt.data.length} matches ranked.`);
+              setStatus(
+                `Refreshed — ${evt.data.length} matches ranked.`
+              );
             } else if (evt.type === 'empty') {
               setEmpty(evt.message);
             } else if (evt.type === 'error') {
@@ -468,13 +484,16 @@ export default function Home() {
     const url = s.issue.html_url;
     const isCurrentlySaved = saved.has(url);
 
-    const me = session?.user?.name?.trim().replace(/^@/, '') || '';
+    const me =
+      session?.user?.name?.trim().replace(/^@/, '') || '';
 
     setSaved((prev) => {
       const next = new Set(prev);
+
       isCurrentlySaved
         ? next.delete(url)
         : next.add(url);
+
       return next;
     });
 
@@ -555,7 +574,8 @@ export default function Home() {
       return;
     }
 
-    const me = session?.user?.name?.trim().replace(/^@/, '') || '';
+    const me =
+      session?.user?.name?.trim().replace(/^@/, '') || '';
 
     if (!me) {
       setError('Could not determine your signed-in username.');
@@ -612,7 +632,9 @@ export default function Home() {
         return next;
       });
 
-      setSaved((prev) => new Set(prev).add(s.issue.html_url));
+      setSaved((prev) =>
+        new Set(prev).add(s.issue.html_url)
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -626,12 +648,12 @@ export default function Home() {
     () =>
       results
         ? Array.from(
-          new Set(
-            results.map(
-              (s) => s.issue._matchedLanguage
+            new Set(
+              results.map(
+                (s) => s.issue._matchedLanguage
+              )
             )
           )
-        )
         : [],
     [results]
   );
@@ -686,10 +708,10 @@ export default function Home() {
 
   const langEntries = skillGraph
     ? Object.entries(
-      skillGraph.languageShare
-    )
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+        skillGraph.languageShare
+      )
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
     : [];
 
   const stageLabels = [
@@ -698,6 +720,7 @@ export default function Home() {
     'GH Issues',
     'Score',
   ];
+
   return (
     <>
       <div className="topbar">
@@ -705,10 +728,25 @@ export default function Home() {
           Aptus
         </Link>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <a className="star-btn pill-white" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+        <div
+          style={{
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+          }}
+        >
+          <a
+            className="star-btn pill-white"
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <GithubIcon />
-            <span>{stars !== null ? stars.toLocaleString() : '—'}</span>
+            <span>
+              {stars !== null
+                ? stars.toLocaleString()
+                : '—'}
+            </span>
           </a>
 
           {session ? (
@@ -716,18 +754,18 @@ export default function Home() {
               {session.user.name || 'My Profile'}
             </Link>
           ) : (
-            <Link className="star-btn pill-white" href="/sign-in">
+            <Link
+              className="star-btn pill-white"
+              href="/sign-in"
+            >
               Get Started
             </Link>
           )}
         </div>
       </div>
 
-
       <div className="shell">
         <div className="hero">
-
-
           <div
             className="eyebrow"
             style={{
@@ -743,9 +781,6 @@ export default function Home() {
             <GithubIcon />
             <span>Proudly Open Source</span>
           </div>
-
-
-
 
           <h1>
             Open Source{' '}
@@ -767,7 +802,12 @@ export default function Home() {
           </p>
 
           <div className="hero-cta-row">
-            <a className="star-btn pill-white" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            <a
+              className="star-btn pill-white"
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <GithubIcon />
               <span>Contribute here</span>
             </a>
@@ -777,8 +817,11 @@ export default function Home() {
                 {session.user.name || 'My Profile'}
               </Link>
             ) : (
-                <Link className="star-btn pill-white" href="/sign-in">
-                  <HistoryCircleIcon/>
+              <Link
+                className="star-btn pill-white"
+                href="/sign-in"
+              >
+                <HistoryCircleIcon />
                 History
               </Link>
             )}
@@ -812,25 +855,43 @@ export default function Home() {
 
           {recentScans && recentScans.length > 0 && (
             <>
-              <div className="recent-label">Recently analyzed</div>
+              <div className="recent-label">
+                Recently analyzed
+              </div>
+
               <div className="recent-row">
                 {recentScans.map((r) => (
-                  <div key={r.id} className="recent-chip">
+                  <div
+                    key={r.id}
+                    className="recent-chip"
+                  >
                     <button
                       className="recent-chip-main"
-                      onClick={() => loadFromCache(r)}
-                      disabled={loadingCacheId === r.id}
+                      onClick={() =>
+                        loadFromCache(r)
+                      }
+                      disabled={
+                        loadingCacheId === r.id
+                      }
                     >
                       {r.avatarUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.avatarUrl} alt={r.targetUsername} />
+                        <img
+                          src={r.avatarUrl}
+                          alt={r.targetUsername}
+                        />
                       )}
-                      {loadingCacheId === r.id ? 'Loading…' : `@${r.targetUsername}`}
+
+                      {loadingCacheId === r.id
+                        ? 'Loading…'
+                        : `@${r.targetUsername}`}
                     </button>
 
                     <button
                       className="recent-chip-delete"
-                      onClick={(e) => deleteRecentScan(r.id, e)}
+                      onClick={(e) =>
+                        deleteRecentScan(r.id, e)
+                      }
                       aria-label={`Remove ${r.targetUsername} from recently analyzed`}
                     >
                       ×
@@ -843,6 +904,7 @@ export default function Home() {
 
           <div className="status-line">
             {status}
+
             {loading && (
               <span className="blink" />
             )}
@@ -853,34 +915,35 @@ export default function Home() {
               <Fragment key={label}>
                 <div className="rail-step">
                   <div
-                    className={`rail-num${stage >= i
-                      ? ' active'
-                      : ''
-                      }`}
+                    className={`rail-num${
+                      stage >= i
+                        ? ' active'
+                        : ''
+                    }`}
                   >
                     {i + 1}
                   </div>
 
                   <div
-                    className={`rail-label${stage >= i
-                      ? ' active'
-                      : ''
-                      }`}
+                    className={`rail-label${
+                      stage >= i
+                        ? ' active'
+                        : ''
+                    }`}
                   >
                     {label}
                   </div>
                 </div>
 
-
                 {i < stageLabels.length - 1 && (
                   <div
-                    className={`rail-line${stage > i
-                      ? ' active'
-                      : ''
+                    className={`rail-line${
+                      stage > i
+                        ? ' active'
+                        : ''
                     }`}
                   />
                 )}
-
               </Fragment>
             ))}
           </div>
@@ -933,7 +996,7 @@ export default function Home() {
                 </div>
               </div>
 
-            <a
+              <a
                 className="profile-link"
                 href={profile.htmlUrl}
                 target="_blank"
@@ -985,20 +1048,21 @@ export default function Home() {
             <div className="tags">
               {skillGraph.keywords.length ===
                 0 && (
-                  <span className="tag">
-                    no strong domain signals
-                    detected
-                  </span>
-                )}
+                <span className="tag">
+                  no strong domain signals
+                  detected
+                </span>
+              )}
 
               {skillGraph.keywords.map(
                 (k) => (
                   <span
-                    className={`tag${skillGraph
-                      .prKeywordCounts[k]
-                      ? ' hot'
-                      : ''
-                      }`}
+                    className={`tag${
+                      skillGraph
+                        .prKeywordCounts[k]
+                        ? ' hot'
+                        : ''
+                    }`}
                     key={k}
                   >
                     {k}
@@ -1006,13 +1070,13 @@ export default function Home() {
                     {skillGraph
                       .prKeywordCounts[k]
                       ? ` (${skillGraph
-                        .prKeywordCounts[k]
-                      } past PR${skillGraph
-                        .prKeywordCounts[k] >
-                        1
-                        ? 's'
-                        : ''
-                      })`
+                          .prKeywordCounts[k]
+                        } past PR${
+                          skillGraph
+                            .prKeywordCounts[k] > 1
+                            ? 's'
+                            : ''
+                        })`
                       : ''}
                   </span>
                 )
@@ -1036,23 +1100,22 @@ export default function Home() {
                   disabled={refreshing}
                 >
                   <RefreshIcon />
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                  {refreshing
+                    ? 'Refreshing...'
+                    : 'Refresh'}
                 </button>
 
                 {availableLangs.map(
                   (lang) => (
                     <button
                       key={lang}
-                      className={`chip${activeLangs.has(
-                        lang
-                      )
-                        ? ' active'
-                        : ''
-                        }`}
+                      className={`chip${
+                        activeLangs.has(lang)
+                          ? ' active'
+                          : ''
+                      }`}
                       onClick={() =>
-                        toggleLang(
-                          lang
-                        )
+                        toggleLang(lang)
                       }
                     >
                       {lang}
@@ -1117,7 +1180,8 @@ export default function Home() {
                         <div className="card-repo">
                           {repoFull}
                         </div>
-                       <a
+
+                        <a
                           className="card-title"
                           href={
                             s.issue.html_url
@@ -1139,6 +1203,7 @@ export default function Home() {
                           <b>
                             {s.score}
                           </b>
+
                           <small>
                             PCT
                           </small>
@@ -1148,27 +1213,21 @@ export default function Home() {
 
                     <div
                       className="breakdown"
-                      title={`Language ${s.breakdown
-                        ?.language ?? 0
-                        } · Keywords ${s.breakdown
-                          ?.keywords ?? 0
-                        } · PR history ${s.breakdown
-                          ?.prHistory ?? 0
-                        } · Accessibility ${s.breakdown
-                          ?.accessibility ??
-                        0
-                        }`}
+                      title={`Language ${
+                        s.breakdown?.language ?? 0
+                      } · Keywords ${
+                        s.breakdown?.keywords ?? 0
+                      } · PR history ${
+                        s.breakdown?.prHistory ?? 0
+                      } · Accessibility ${
+                        s.breakdown?.accessibility ?? 0
+                      }`}
                     >
                       {[
-                        s.breakdown
-                          ?.language ?? 0,
-                        s.breakdown
-                          ?.keywords ?? 0,
-                        s.breakdown
-                          ?.prHistory ?? 0,
-                        s.breakdown
-                          ?.accessibility ??
-                        0,
+                        s.breakdown?.language ?? 0,
+                        s.breakdown?.keywords ?? 0,
+                        s.breakdown?.prHistory ?? 0,
+                        s.breakdown?.accessibility ?? 0,
                       ].map(
                         (v, i) => (
                           <div
@@ -1177,7 +1236,7 @@ export default function Home() {
                               width: `${v}%`,
                               background:
                                 SEGMENT_COLORS[
-                                i
+                                  i
                                 ],
                             }}
                           />
@@ -1191,8 +1250,7 @@ export default function Home() {
                         {s.repoCount}
                       </b>{' '}
                       repositor
-                      {s.repoCount ===
-                        1
+                      {s.repoCount === 1
                         ? 'y'
                         : 'ies'}{' '}
                       using{' '}
@@ -1205,72 +1263,70 @@ export default function Home() {
                       (~
                       {Math.round(
                         s.langShare *
-                        100
+                          100
                       )}
                       % of your recent code).
 
                       {s
                         .prBonusKeywords
-                        .length >
-                        0 && (
-                          <>
-                            {' '}
-                            You&apos;ve
-                            previously
-                            opened{' '}
-                            <b>
-                              {
-                                s
-                                  .prKeywordCounts[
+                        .length > 0 && (
+                        <>
+                          {' '}
+                          You&apos;ve
+                          previously
+                          opened{' '}
+                          <b>
+                            {
+                              s
+                                .prKeywordCounts[
                                 s
                                   .prBonusKeywords[0]
-                                ]
-                              }
-                            </b>{' '}
-                            pull
-                            request
-                            {s
-                              .prKeywordCounts[
+                              ]
+                            }
+                          </b>{' '}
+                          pull
+                          request
+                          {s
+                            .prKeywordCounts[
+                            s
+                              .prBonusKeywords[0]
+                          ] > 1
+                            ? 's'
+                            : ''}{' '}
+                          touching{' '}
+                          <b>
+                            {
                               s
                                 .prBonusKeywords[0]
-                            ] > 1
-                              ? 's'
-                              : ''}{' '}
-                            touching{' '}
-                            <b>
-                              {
-                                s
-                                  .prBonusKeywords[0]
-                              }
-                            </b>
-                            .
-                          </>
-                        )}
+                            }
+                          </b>
+                          .
+                        </>
+                      )}
 
                       {s
                         .matchedKeywords
-                        .length >
-                        0 && (
-                          <>
-                            {' '}
-                            This issue
-                            involves{' '}
-                            <b>
-                              {s.matchedKeywords
-                                .slice(
-                                  0,
-                                  3
-                                )
-                                .join(
-                                  ', '
-                                )}
-                            </b>{' '}
-                            — territory
-                            your own
-                            repos already
-                            cover.
-                          </>
-                        )}
+                        .length > 0 && (
+                        <>
+                          {' '}
+                          This issue
+                          involves{' '}
+                          <b>
+                            {s.matchedKeywords
+                              .slice(
+                                0,
+                                3
+                              )
+                              .join(
+                                ', '
+                              )}
+                          </b>{' '}
+                          — territory
+                          your own
+                          repos already
+                          cover.
+                        </>
+                      )}
                     </div>
 
                     <div className="stat-grid">
@@ -1354,10 +1410,11 @@ export default function Home() {
 
                     <div className="card-actions">
                       <button
-                        className={`icon-btn${isSaved
-                          ? ' saved'
-                          : ''
-                          }`}
+                        className={`icon-btn${
+                          isSaved
+                            ? ' saved'
+                            : ''
+                        }`}
                         onClick={() =>
                           toggleSaved(s)
                         }
@@ -1377,17 +1434,18 @@ export default function Home() {
                         }
                       >
                         {copied ===
-                          s.issue
-                            .html_url
+                        s.issue
+                          .html_url
                           ? '✓ Copied'
                           : '⎘ Copy link'}
                       </button>
 
                       <button
-                        className={`icon-btn${isMarkedSolved
-                          ? ' saved'
-                          : ''
-                          }`}
+                        className={`icon-btn${
+                          isMarkedSolved
+                            ? ' saved'
+                            : ''
+                        }`}
                         onClick={() =>
                           markSolved(s)
                         }
@@ -1429,8 +1487,13 @@ export default function Home() {
       </div>
 
       <div className="page-footer">
-        <span>© {new Date().getFullYear()} Aptus. All rights reserved.</span>
-        <span>Made with <span className="heart">♥</span> by Sankalp</span>
+        <span>
+          © {new Date().getFullYear()} Aptus. All rights reserved.
+        </span>
+
+        <span>
+          Made with <span className="heart">♥</span> by Sankalp
+        </span>
       </div>
     </>
   );
