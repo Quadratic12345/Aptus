@@ -50,7 +50,8 @@ export async function POST(req: Request) {
 
       try {
         const session = await auth.api.getSession({ headers: req.headers });
-        const deviceIdentity = session?.user?.name?.trim() || clientId || 'anonymous';
+
+        const deviceIdentity = clientId || 'anonymous';
 
         // Shared cache check
         const cutoff = new Date(Date.now() - CACHE_WINDOW_MS);
