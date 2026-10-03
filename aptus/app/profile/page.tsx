@@ -46,7 +46,7 @@ export default function ProfilePage() {
     // a 500 with a JSON error body still resolves fine as far as fetch()
     // is concerned, so silently checking Array.isArray() alone hides the
     // actual failure behind a plain "no history" empty state.
-    fetch(`/api/scans?scannedBy=${encodeURIComponent(githubUsername)}`)
+       fetch(`/api/device-scans?identity=${encodeURIComponent(githubUsername)}`, { cache: 'no-store' })
       .then(async (res) => {
         const text = await res.text();
         let data: unknown;
