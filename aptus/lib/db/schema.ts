@@ -37,3 +37,12 @@ export const scanHistory = pgTable('scan_history', {
   resultsJson: text('results_json').notNull(),
   scannedAt: timestamp('scanned_at').defaultNow().notNull(),
 });
+export const deviceScans = pgTable('device_scans', {
+  id: serial('id').primaryKey(),
+  deviceId: text('device_id').notNull(), // signed-in username OR anonymous device id
+  targetUsername: text('target_username').notNull(),
+  profileJson: text('profile_json'),
+  skillGraphJson: text('skill_graph_json'),
+  resultsJson: text('results_json').notNull(),
+  scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+});
