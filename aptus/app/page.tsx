@@ -10,6 +10,7 @@ import { useState, useRef, Fragment, useMemo, useEffect } from 'react';
 
 const REPO_URL = 'https://github.com/Quadratic12345/Aptus';
 
+
 type Scored = {
   issue: {
     title: string;
@@ -115,8 +116,28 @@ export default function Home() {
   const [stars, setStars] = useState<number | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[] | null>(null);
 
+  const [identity] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    const existingId = localStorage.getItem('aptus-client-id');
+
+    if (existingId) {
+      return existingId;
+    }
+
+    const newId = crypto.randomUUID();
+    localStorage.setItem('aptus-client-id', newId);
+
+    return newId;
+  });
+
+
   function fetchRecentScans() {
-    fetch('/api/device-scans/recent')
+    fetch(
+        `/api/device-scans/recent?identity=${encodeURIComponent(identity)}`
+      )
       .then((res) => res.json())
       .then((data) => setRecentScans(Array.isArray(data) ? data : []))
       .catch(() => setRecentScans([]));
