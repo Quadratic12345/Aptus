@@ -334,6 +334,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           username: u,
+          clientId: identity,
         }),
       });
 
@@ -431,6 +432,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           username: u,
+          clientId: identity,
           forceRefresh: true,
         }),
       });
