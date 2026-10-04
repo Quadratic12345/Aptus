@@ -1033,27 +1033,24 @@ export async function runAnalysis(
   // guaranteed slots for high-popularity issues, then fill the rest normally.
   const diversePool = capPerRepo(scoredAll, 2);
 
-  const knownOrgCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) >= 5);
-  const popularCandidates = diversePool.filter((s) => {
-    const p = s.issue._popularity ?? 0;
-    return p >= 3 && p < 5;
-  });
-  const otherCandidates = scoredAll.filter((s) => (s.issue._popularity ?? 0) < 3);
+  // Fill greedily, highest popularity tier first — so MOST of the final 8
+  // are big orgs / high-star repos whenever enough exist, instead of just
+  // guaranteeing a small minority and letting ordinary repos dominate the rest.
+  const tier5 = shuffle(diversePool.filter((s) => (s.issue._popularity ?? 0) >= 5)); // named big orgs
+  const tier3 = shuffle(diversePool.filter((s) => (s.issue._popularity ?? 0) === 3)); // generic >500-star repos
+  const tier1 = shuffle(diversePool.filter((s) => (s.issue._popularity ?? 0) === 1)); // smaller good-first-issue repos
+  const tier0 = shuffle(diversePool.filter((s) => (s.issue._popularity ?? 0) === 0)); // everything else
 
-  // Priority: named big orgs first, then generic high-star repos, filling
-  // up to a minimum popular total, then the rest from the normal pool.
-  const guaranteedKnownOrg = knownOrgCandidates.slice(0, 2);
-  const MIN_POPULAR_SLOTS = 2;
-  const stillNeeded = Math.max(MIN_POPULAR_SLOTS - guaranteedKnownOrg.length, 0);
-  const guaranteedGeneric = popularCandidates.slice(0, stillNeeded);
+  const picked: typeof diversePool = [];
+  for (const tier of [tier5, tier3, tier1, tier0]) {
+    for (const item of tier) {
+      if (picked.length >= 8) break;
+      picked.push(item);
+    }
+    if (picked.length >= 8) break;
+  }
 
-  const guaranteedPopular = [...guaranteedKnownOrg, ...guaranteedGeneric];
-  const remainingSlots = Math.max(8 - guaranteedPopular.length, 0);
-
-  const otherPool = otherCandidates.slice(0, 15);
-  const fillers = shuffle(otherPool).slice(0, remainingSlots);
-
-  const scored = shuffle([...guaranteedPopular, ...fillers]);
+  const scored = shuffle(picked);
 
   console.log('[Aptus debug] diversePool size:', diversePool.length);
   console.log('[Aptus debug] knownOrgCandidates:', knownOrgCandidates.map((s) => s.issue.repository_url));
