@@ -1053,10 +1053,8 @@ export async function runAnalysis(
   const scored = shuffle(picked);
 
   console.log('[Aptus debug] diversePool size:', diversePool.length);
-  console.log('[Aptus debug] knownOrgCandidates:', knownOrgCandidates.map((s) => s.issue.repository_url));
-  console.log('[Aptus debug] popularCandidates (>=3,<5):', popularCandidates.map((s) => s.issue.repository_url));
-  console.log('[Aptus debug] guaranteedPopular repos:', guaranteedPopular.map((s) => s.issue.repository_url));
+  console.log('[Aptus debug] tier5 (known orgs):', tier5.length, tier5.map((s) => s.issue.repository_url));
+  console.log('[Aptus debug] tier3 (>500 stars):', tier3.length, tier3.map((s) => s.issue.repository_url));
   console.log('[Aptus debug] final scored repos:', scored.map((s) => s.issue.repository_url));
-
   emit({ type: 'results', data: scored });
 }
