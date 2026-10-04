@@ -353,7 +353,7 @@ async function fetchFlagshipIssues(lang: string, token: string): Promise<GhIssue
 
   // Only try 2 repos per language — keeps the extra API cost small and
   // predictable regardless of how many flagship repos are listed.
-  const picked = shuffle(repos).slice(0, 2);
+  const picked = shuffle(repos).slice(0, 4);
   const collected: GhIssue[] = [];
 
   const cutoff = recentCutoffDate(18);
