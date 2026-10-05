@@ -85,6 +85,18 @@ export default function ProfilePage() {
     });
     setItems((prev) => prev?.filter((i) => i.issueUrl !== issueUrl) || null);
   }
+  async function deleteHistoryEntry(id: number) {
+    setHistory((prev) => prev?.filter((h) => h.id !== id) || null);
+
+    try {
+      const res = await fetch(`/api/device-scans/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setHistoryError('Could not delete that history entry — it may still appear.');
+      }
+    } catch {
+      setHistoryError('Could not delete that history entry — it may still appear.');
+    }
+  }
 
   return (
     <>
@@ -199,7 +211,15 @@ export default function ProfilePage() {
                       >
                         {expanded === h.id ? '▲ Hide issues' : '▼ Show issues'}
                       </button>
+
+                      <button
+                        className="icon-btn"
+                        onClick={() => deleteHistoryEntry(h.id)}
+                      >
+                        ✕ Delete
+                      </button>
                     </div>
+
 
                     {expanded === h.id && (
                       <div className="labels-row" style={{ flexDirection: 'column', alignItems: 'stretch', marginTop: '12px' }}>
