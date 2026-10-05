@@ -5,6 +5,7 @@ import { useSession } from '@/lib/auth-client';
 import GithubIcon from '@/components/ui/github-icon';
 import RefreshIcon from '@/components/ui/refresh-icon';
 import HistoryCircleIcon from '@/components/ui/history-circle-icon';
+import ColorPalette from "@/components/ui/color-palette";
 import Link from 'next/link';
 import { useState, useRef, Fragment, useMemo, useEffect } from 'react';
 
@@ -744,6 +745,7 @@ export default function Home() {
     'Score',
   ];
 
+
   return (
     <>
       <div className="topbar">
@@ -772,18 +774,13 @@ export default function Home() {
             </span>
           </a>
 
-          {session ? (
+          {session && (
             <Link className="star-btn" href="/profile">
               {session.user.name || 'My Profile'}
             </Link>
-          ) : (
-            <Link
-              className="star-btn pill-white"
-              href="/sign-in"
-            >
-              Get Started
-            </Link>
           )}
+
+          <ColorPalette />
         </div>
       </div>
 
