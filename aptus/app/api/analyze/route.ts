@@ -1,12 +1,14 @@
 import { runAnalysis } from '@/lib/github-matchmaker';
 import { db } from '@/lib/db';
 import { scanHistory, deviceScans } from '@/lib/db/schema';
-import { desc, gte, sql } from 'drizzle-orm';
+import { desc, gte, sql, eq, and } from 'drizzle-orm';
+import * as authSchema from '@/lib/db/auth-schema';
 import { auth } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
 const CACHE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const FREE_TRIAL_WINDOW_MS = 24 * 60 * 60 * 1000; // 1 free scan per device per day
 
 async function saveDeviceScan(
   deviceId: string,
@@ -25,6 +27,19 @@ async function saveDeviceScan(
     });
   } catch {
     // best-effort — never fail the response over a private-history write
+  }
+}
+
+async function getUserGithubToken(userId: string): Promise<string | null> {
+  try {
+    const rows = await db
+      .select({ accessToken: authSchema.account.accessToken })
+      .from(authSchema.account)
+      .where(and(eq(authSchema.account.userId, userId), eq(authSchema.account.providerId, 'github')))
+      .limit(1);
+    return rows[0]?.accessToken ?? null;
+  } catch {
+    return null; // fall back to the shared server token
   }
 }
 
@@ -51,9 +66,42 @@ export async function POST(req: Request) {
       try {
         const session = await auth.api.getSession({ headers: req.headers });
 
-        const deviceIdentity = clientId || 'anonymous';
+        // Signed-in users are tracked by their account name (so their
+        // history follows them across devices); anonymous visitors by
+        // their browser-generated clientId.
+        const deviceIdentity = session?.user?.name?.trim() || clientId || 'anonymous';
 
-        // Shared cache check
+        // Use the signed-in user's own GitHub token when available — their
+        // scans then draw from THEIR 5,000/hr quota, not the shared server
+        // token's pool.
+        let effectiveToken = token;
+        if (session?.user?.id) {
+          const userToken = await getUserGithubToken(session.user.id);
+          if (userToken) effectiveToken = userToken;
+        }
+
+        // Free-trial gate: anonymous devices get 1 scan per rolling 24
+        // hours, then must sign in. Signed-in users are unaffected.
+        if (!session) {
+          const oneDayAgo = new Date(Date.now() - FREE_TRIAL_WINDOW_MS);
+          const priorScans = await db
+            .select({ id: deviceScans.id })
+            .from(deviceScans)
+            .where(and(eq(deviceScans.deviceId, deviceIdentity), gte(deviceScans.scannedAt, oneDayAgo)))
+            .limit(1);
+
+          if (priorScans.length > 0) {
+            emit({
+              type: 'auth_required',
+              message: "You've used today's free search. Sign in with GitHub for unlimited searches — it's free and takes a few seconds.",
+            });
+            controller.close();
+            return;
+          }
+        }
+
+        // Shared cache check (GitHub-avoidance only — scoped by target
+        // username, not by who's asking)
         const cutoff = new Date(Date.now() - CACHE_WINDOW_MS);
         const cached = forceRefresh
           ? []
@@ -80,7 +128,7 @@ export async function POST(req: Request) {
           emit({ type: 'status', stage: 3, message: 'Done.' });
           emit({ type: 'results', data: parsedResults });
 
-          // Saved GitHub a call, but this device still needs its own
+          // Saved GitHub a call, but this device/user still needs its own
           // private history entry for this scan.
           await saveDeviceScan(deviceIdentity, cleanUsername, parsedProfile, parsedSkillGraph, parsedResults);
 
@@ -88,7 +136,7 @@ export async function POST(req: Request) {
           return;
         }
 
-        // No cache hit run a fresh scan
+        // No cache hit — run a fresh scan
         let capturedProfile: unknown = null;
         let capturedSkillGraph: unknown = null;
         let capturedResults: unknown = null;
@@ -100,7 +148,7 @@ export async function POST(req: Request) {
           emit(obj);
         };
 
-        await runAnalysis(cleanUsername, token, wrappedEmit);
+        await runAnalysis(cleanUsername, effectiveToken, wrappedEmit);
 
         if (capturedResults) {
           // Shared cache — purely for GitHub rate-limit protection.
