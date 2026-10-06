@@ -149,6 +149,7 @@ export default function Home() {
   }, []);
 
   const [loadingCacheId, setLoadingCacheId] = useState<number | null>(null);
+  const [requiresAuth, setRequiresAuth] = useState(false);
 
   async function deleteRecentScan(
     id: number,
@@ -316,6 +317,7 @@ export default function Home() {
     setStatus('');
     setError('');
     setEmpty('');
+    setRequiresAuth(false);
     setProfile(null);
     setSkillGraph(null);
     setResults(null);
@@ -391,7 +393,11 @@ export default function Home() {
               // Server saves the scan automatically now (signed in or not).
               // Just refresh the chip list so the new entry shows up.
               fetchRecentScans();
-            } else if (evt.type === 'empty') {
+            }else if (evt.type === 'auth_required') {
+                          setError(evt.message);
+              setRequiresAuth(true);
+            }
+            else if (evt.type === 'empty') {
               setEmpty(evt.message);
             } else if (evt.type === 'error') {
               setError(evt.message);
@@ -476,7 +482,11 @@ export default function Home() {
               setStatus(
                 `Refreshed — ${evt.data.length} matches ranked.`
               );
-            } else if (evt.type === 'empty') {
+            } else if (evt.type === 'auth_required') {
+                         setError(evt.message);
+                         setRequiresAuth(true);
+                       }
+            else if (evt.type === 'empty') {
               setEmpty(evt.message);
             } else if (evt.type === 'error') {
               setError(evt.message);
@@ -1502,6 +1512,11 @@ export default function Home() {
         {error && (
           <div className="err">
             &gt; {error}
+            {requiresAuth && (
+              <Link className="star-btn pill-white" href="/sign-in" style={{ marginLeft: '12px' }}>
+                Sign In
+              </Link>
+            )}
           </div>
         )}
       </div>
