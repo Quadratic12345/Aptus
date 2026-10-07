@@ -1044,10 +1044,10 @@ export async function runAnalysis(
   const picked: typeof diversePool = [];
   for (const tier of [tier5, tier3, tier1, tier0]) {
     for (const item of tier) {
-      if (picked.length >= 8) break;
+      if (picked.length >= 10) break;
       picked.push(item);
     }
-    if (picked.length >= 8) break;
+    if (picked.length >= 10) break;
   }
 
   const scored = shuffle(picked);

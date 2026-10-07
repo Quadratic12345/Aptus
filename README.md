@@ -272,8 +272,9 @@ Create a fine-grained token at **GitHub → Settings → Developer settings → 
 
 ## License
 
-<!-- Add your chosen license here, e.g. MIT -->
+## License
 
+MIT — see [LICENSE](./LICENSE) for the full text.
 ---
 
 <div align="center">
